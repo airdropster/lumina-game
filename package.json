@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test tests/"
+    "test": "node --test tests/db.test.js tests/server.test.js tests/cards.test.js tests/scoring.test.js tests/game.test.js tests/bot.test.js"
   },
   "engines": {
     "node": ">=20.0.0"
