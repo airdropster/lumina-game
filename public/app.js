@@ -1,0 +1,526 @@
+/** @module app – Main game controller for LUMINA */
+
+import { createGame, PHASE, ACTION } from './game.js';
+import { chooseBotReveal, chooseBotAction } from './bot.js';
+import { calcRoundScore } from './scoring.js';
+import {
+  renderSetupScreen,
+  renderGameBoard,
+  renderRoundEnd,
+  renderGameEnd,
+  renderHistory,
+  showConfirmDialog,
+  logAction,
+} from './ui.js';
+import { saveGameStats, fetchHistory } from './stats.js';
+
+// ── State ──────────────────────────────────────────────────────────────
+
+let game = null;
+let selectedAction = null;   // 'construct' | 'attack' | 'secure' | null
+let attackStep = null;        // tracks multi-step attack flow
+let constructSource = null;   // 'deck' | 'discard' | null
+let roundStats = [];          // accumulated round data for stats saving
+let isProcessingBot = false;  // prevent user clicks during bot turns
+
+// Bot thinking delays by difficulty (ms)
+const BOT_DELAY = { easy: 800, medium: 1200, hard: 1800 };
+
+// ── Boot ───────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+  showSetup();
+});
+
+// ── Setup Screen ───────────────────────────────────────────────────────
+
+function showSetup() {
+  game = null;
+  selectedAction = null;
+  attackStep = null;
+  constructSource = null;
+  roundStats = [];
+  isProcessingBot = false;
+  renderSetupScreen(document.body, onStartGame);
+}
+
+function onStartGame({ botCount, botDifficulties }) {
+  game = createGame({ botCount, botDifficulties });
+  roundStats = [];
+  startRevealPhase();
+}
+
+// ── Reveal Phase ───────────────────────────────────────────────────────
+
+function startRevealPhase() {
+  // Bots auto-reveal their 2 cards
+  for (let b = 1; b < game.players.length; b++) {
+    const reveals = chooseBotReveal(game, b);
+    for (const [r, c] of reveals) {
+      game.revealCard(b, r, c);
+    }
+  }
+
+  // Player needs to reveal 2 cards
+  game.actionLog.push('Reveal 2 of your cards to begin.');
+  renderBoard();
+}
+
+// ── Render Board ───────────────────────────────────────────────────────
+
+function renderBoard() {
+  renderGameBoard(document.body, game, {
+    onCardClick: handleCardClick,
+    onBotCardClick: handleBotCardClick,
+    onBotTabClick: () => {},
+    onDeckClick: handleDeckClick,
+    onDiscardClick: handleDiscardClick,
+    onActionClick: handleActionClick,
+  });
+
+  // Show phase-specific status in the log
+  if (game.phase === PHASE.REVEAL) {
+    const remaining = game.players[0].revealsLeft;
+    if (remaining > 0) {
+      logAction(document, `Click ${remaining} of your face-down cards to reveal.`);
+    }
+  } else if (game.phase === PHASE.PLAYING || game.phase === PHASE.FINAL_TURNS) {
+    const current = game.players[game.currentPlayerIndex];
+    if (game.currentPlayerIndex === 0) {
+      logAction(document, `Your turn — choose an action.`);
+    } else {
+      logAction(document, `${current.name} is thinking...`);
+    }
+  }
+
+  // Highlight selected action
+  if (selectedAction) {
+    const btnMap = { construct: '.btn-construct', attack: '.btn-attack', secure: '.btn-secure' };
+    const btn = document.querySelector(btnMap[selectedAction]);
+    if (btn) btn.classList.add('selected');
+  }
+}
+
+// ── Card Click (Player Grid) ───────────────────────────────────────────
+
+function handleCardClick(row, col) {
+  if (isProcessingBot) return;
+
+  // Reveal phase
+  if (game.phase === PHASE.REVEAL) {
+    const player = game.players[0];
+    if (player.revealsLeft <= 0) return;
+    const card = player.grid[row][col];
+    if (card.faceUp) return;
+
+    game.revealCard(0, row, col);
+
+    if (player.revealsLeft === 0) {
+      // All players revealed — start game
+      game.startGame();
+      game.actionLog.push('Game started!');
+      renderBoard();
+      // If bot goes first, trigger bot turn
+      if (game.currentPlayerIndex !== 0) {
+        scheduleBotTurn();
+      }
+    } else {
+      renderBoard();
+    }
+    return;
+  }
+
+  // Playing phase — only on player's turn
+  if (game.currentPlayerIndex !== 0) return;
+
+  if (!selectedAction) {
+    logAction(document, 'Select an action first (Construct, Attack, or Secure).');
+    return;
+  }
+
+  const card = game.players[0].grid[row][col];
+
+  // CONSTRUCT
+  if (selectedAction === 'construct') {
+    if (constructSource === 'deck') {
+      // Player chose to place deck draw at this position
+      if (card.hasPrism) {
+        logAction(document, 'Cannot replace a prismed card.');
+        return;
+      }
+      game.constructFromDeck(0, row, col);
+      endPlayerTurn();
+    } else if (constructSource === 'discard') {
+      if (card.hasPrism) {
+        logAction(document, 'Cannot replace a prismed card.');
+        return;
+      }
+      game.constructFromDiscard(0, row, col);
+      endPlayerTurn();
+    } else if (constructSource === 'deck_discard') {
+      // Player drew from deck and chose to discard — reveal a face-down card
+      if (card.faceUp) {
+        logAction(document, 'Select a face-down card to reveal.');
+        return;
+      }
+      game.constructDiscardDraw(0, row, col);
+      endPlayerTurn();
+    } else {
+      logAction(document, 'Draw from the Deck or Discard pile first.');
+    }
+    return;
+  }
+
+  // ATTACK — multi-step
+  if (selectedAction === 'attack') {
+    if (!attackStep) {
+      // Step 1: select your face-up card to swap
+      if (!card.faceUp || card.hasPrism) {
+        logAction(document, 'Select one of your face-up, non-prismed cards to swap.');
+        return;
+      }
+      attackStep = { attackerRow: row, attackerCol: col };
+      logAction(document, `Selected your card at (${row + 1},${col + 1}). Now click an opponent's card.`);
+      return;
+    }
+    if (attackStep && !attackStep.defenderIndex) {
+      // Need to click bot card, not own card
+      logAction(document, 'Now click on an opponent\'s face-up card to steal.');
+      return;
+    }
+    if (attackStep && attackStep.defenderIndex) {
+      // Step 3: select face-down cost card
+      if (card.faceUp) {
+        logAction(document, 'Select a face-down card to reveal as the attack cost.');
+        return;
+      }
+      const ok = game.attack(
+        0,
+        attackStep.attackerRow, attackStep.attackerCol,
+        attackStep.defenderIndex, attackStep.defenderRow, attackStep.defenderCol,
+        row, col
+      );
+      if (!ok) {
+        logAction(document, 'Invalid attack. Try again.');
+        attackStep = null;
+        return;
+      }
+      endPlayerTurn();
+    }
+    return;
+  }
+
+  // SECURE
+  if (selectedAction === 'secure') {
+    if (!card.faceUp) {
+      logAction(document, 'Select a face-up card to secure with a prism.');
+      return;
+    }
+    if (card.hasPrism) {
+      logAction(document, 'This card already has a prism.');
+      return;
+    }
+    const ok = game.secure(0, row, col);
+    if (!ok) {
+      logAction(document, 'Cannot secure this card. No prisms remaining?');
+      return;
+    }
+    endPlayerTurn();
+  }
+}
+
+// ── Bot Card Click (for Attack targeting) ──────────────────────────────
+
+function handleBotCardClick(botIndex, row, col) {
+  if (isProcessingBot) return;
+  if (game.currentPlayerIndex !== 0) return;
+
+  if (selectedAction === 'attack' && attackStep && !attackStep.defenderIndex) {
+    const card = game.players[botIndex].grid[row][col];
+    if (!card.faceUp || card.hasPrism || card.immune) {
+      logAction(document, 'Invalid target. Pick a face-up, non-prismed, non-immune card.');
+      return;
+    }
+    attackStep.defenderIndex = botIndex;
+    attackStep.defenderRow = row;
+    attackStep.defenderCol = col;
+    logAction(document, `Targeting ${game.players[botIndex].name}'s card at (${row + 1},${col + 1}). Now reveal a face-down card as cost.`);
+  }
+}
+
+// ── Deck Click ─────────────────────────────────────────────────────────
+
+function handleDeckClick() {
+  if (isProcessingBot) return;
+  if (game.currentPlayerIndex !== 0) return;
+
+  if (selectedAction !== 'construct') {
+    logAction(document, 'Select CONSTRUCT first.');
+    return;
+  }
+
+  if (constructSource) {
+    logAction(document, 'You already drew a card. Place it on your grid.');
+    return;
+  }
+
+  // Offer choice: place on grid or discard and reveal
+  showConfirmDialog(
+    'Draw from deck. Place it on your grid, or discard it and reveal a face-down card?',
+    () => {
+      // Confirm = place on grid
+      constructSource = 'deck';
+      logAction(document, 'Click a card in your grid to replace it with the drawn card.');
+    },
+    () => {
+      // Cancel = discard and reveal
+      constructSource = 'deck_discard';
+      logAction(document, 'Click a face-down card to reveal it. The drawn card goes to discard.');
+    }
+  );
+}
+
+// ── Discard Click ──────────────────────────────────────────────────────
+
+function handleDiscardClick() {
+  if (isProcessingBot) return;
+  if (game.currentPlayerIndex !== 0) return;
+
+  if (selectedAction !== 'construct') {
+    logAction(document, 'Select CONSTRUCT first.');
+    return;
+  }
+
+  if (constructSource) {
+    logAction(document, 'You already drew a card. Place it on your grid.');
+    return;
+  }
+
+  if (game.discard.length === 0) {
+    logAction(document, 'Discard pile is empty.');
+    return;
+  }
+
+  constructSource = 'discard';
+  const top = game.discard[game.discard.length - 1];
+  logAction(document, `Picked ${top.value} from discard. Click a card in your grid to replace.`);
+}
+
+// ── Action Button Click ────────────────────────────────────────────────
+
+function handleActionClick(action) {
+  if (isProcessingBot) return;
+  if (game.currentPlayerIndex !== 0) return;
+
+  selectedAction = action;
+  attackStep = null;
+  constructSource = null;
+
+  if (action === 'construct') {
+    logAction(document, 'CONSTRUCT: Draw from Deck or Discard pile.');
+  } else if (action === 'attack') {
+    logAction(document, 'ATTACK: Select your face-up card to swap, then an opponent\'s card, then reveal a cost card.');
+  } else if (action === 'secure') {
+    logAction(document, 'SECURE: Click a face-up card to place a prism on it.');
+  }
+
+  renderBoard();
+}
+
+// ── End Player Turn ────────────────────────────────────────────────────
+
+function endPlayerTurn() {
+  selectedAction = null;
+  attackStep = null;
+  constructSource = null;
+
+  // Check for LUMINA flash
+  if (game.luminaCaller === 0 && game.phase === PHASE.FINAL_TURNS) {
+    logAction(document, 'LUMINA! You revealed all your cards!');
+  }
+
+  // Check if round is over
+  if (game.phase === PHASE.SCORING) {
+    endRound();
+    return;
+  }
+
+  renderBoard();
+
+  // If next player is a bot, schedule bot turn
+  if (game.currentPlayerIndex !== 0) {
+    scheduleBotTurn();
+  }
+}
+
+// ── Bot Turn ───────────────────────────────────────────────────────────
+
+function scheduleBotTurn() {
+  isProcessingBot = true;
+  const bot = game.players[game.currentPlayerIndex];
+  const delay = BOT_DELAY[bot.difficulty] || 1000;
+
+  setTimeout(() => {
+    executeBotTurn();
+  }, delay);
+}
+
+function executeBotTurn() {
+  const botIndex = game.currentPlayerIndex;
+  const bot = game.players[botIndex];
+
+  const action = chooseBotAction(game, botIndex);
+
+  if (action.type === 'construct') {
+    if (action.source === 'discard') {
+      game.constructFromDiscard(botIndex, action.row, action.col);
+    } else if (action.source === 'deck_discard') {
+      game.constructDiscardDraw(botIndex, action.revealRow, action.revealCol);
+    } else {
+      game.constructFromDeck(botIndex, action.row, action.col);
+    }
+  } else if (action.type === 'attack') {
+    game.attack(
+      botIndex,
+      action.attackerRow, action.attackerCol,
+      action.defenderIndex, action.defenderRow, action.defenderCol,
+      action.revealRow, action.revealCol
+    );
+  } else if (action.type === 'secure') {
+    game.secure(botIndex, action.row, action.col);
+  }
+
+  // Check LUMINA
+  if (game.luminaCaller === botIndex && game.phase === PHASE.FINAL_TURNS) {
+    logAction(document, `${bot.name} called LUMINA!`);
+  }
+
+  isProcessingBot = false;
+
+  // Check if round is over
+  if (game.phase === PHASE.SCORING) {
+    endRound();
+    return;
+  }
+
+  renderBoard();
+
+  // If next player is also a bot, schedule another bot turn
+  if (game.currentPlayerIndex !== 0) {
+    scheduleBotTurn();
+  }
+}
+
+// ── End Round ──────────────────────────────────────────────────────────
+
+function endRound() {
+  // Calculate and store round scores before applying them
+  const roundScoreData = [];
+  for (let i = 0; i < game.players.length; i++) {
+    const breakdown = calcRoundScore(game.players[i].grid);
+    const player = game.players[i];
+
+    // Count hidden cards at LUMINA call
+    let hiddenCount = 0;
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 4; c++) {
+        if (!player.grid[r][c].faceUp) hiddenCount++;
+      }
+    }
+
+    roundScoreData.push({
+      roundNumber: game.round,
+      playerName: player.name,
+      roundScore: breakdown.total,
+      attacksMade: player.stats.attacksMade,
+      prismsUsed: player.stats.prismsUsed,
+      hiddenCardsAtLumina: hiddenCount,
+      calledLumina: game.luminaCaller === i ? 1 : 0,
+    });
+  }
+  roundStats.push(...roundScoreData);
+
+  // Apply scoring
+  game.scoreRound();
+
+  // Show round end screen
+  renderRoundEnd(document.body, game, () => {
+    if (game.isGameOver()) {
+      endGame();
+    } else {
+      startNewRound();
+    }
+  });
+}
+
+// ── Start New Round ────────────────────────────────────────────────────
+
+function startNewRound() {
+  // Re-create the game with same players but fresh deck/grids
+  const botCount = game.players.length - 1;
+  const botDifficulties = game.players.slice(1).map((p) => p.difficulty);
+  const cumulativeScores = [...game.cumulativeScores];
+  const round = game.round + 1;
+
+  game = createGame({ botCount, botDifficulties });
+  game.cumulativeScores = cumulativeScores;
+  game.round = round;
+
+  startRevealPhase();
+}
+
+// ── End Game ───────────────────────────────────────────────────────────
+
+async function endGame() {
+  const winner = game.getWinner();
+  const scores = [...game.cumulativeScores];
+
+  // Save stats to server
+  try {
+    await saveGameStats(
+      {
+        numPlayers: game.players.length,
+        numRounds: game.round,
+        winner,
+        playerFinalScore: scores[0],
+      },
+      roundStats
+    );
+  } catch (e) {
+    console.error('Failed to save stats:', e);
+  }
+
+  renderGameEnd(document.body, scores, winner, {
+    onPlayAgain: showSetup,
+    onViewHistory: showHistoryScreen,
+  });
+}
+
+// ── History Screen ─────────────────────────────────────────────────────
+
+async function showHistoryScreen() {
+  try {
+    const history = await fetchHistory();
+
+    // Transform server data to UI format
+    const sessions = (history || []).map((s) => ({
+      date: new Date(s.playedAt).toLocaleDateString(),
+      players: s.numPlayers,
+      rounds: s.numRounds,
+      winner: s.winner,
+      playerScore: s.playerFinalScore,
+      roundDetails: (s.rounds || [])
+        .filter((r) => r.playerName === 'Player')
+        .map((r) => ({
+          round: r.roundNumber,
+          playerScore: r.roundScore,
+          roundWinner: r.calledLumina ? 'LUMINA caller' : '-',
+        })),
+    }));
+
+    renderHistory(document.body, sessions);
+  } catch (e) {
+    console.error('Failed to fetch history:', e);
+    renderHistory(document.body, []);
+  }
+}

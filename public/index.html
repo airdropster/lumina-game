@@ -3,41 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LUMINA - Coming Soon</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #0a0a2e, #1a1a4e, #0a0a2e);
-      color: #fff;
-      font-family: system-ui, sans-serif;
-    }
-    .card {
-      text-align: center;
-      padding: 3rem;
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 1rem;
-      background: rgba(255,255,255,0.05);
-      backdrop-filter: blur(10px);
-    }
-    h1 {
-      font-size: 3rem;
-      letter-spacing: 0.5rem;
-      margin-bottom: 1rem;
-      background: linear-gradient(90deg, #f0c, #0cf);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    p { color: rgba(255,255,255,0.6); font-size: 1.1rem; }
-  </style>
+  <title>LUMINA</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="card">
-    <h1>LUMINA</h1>
-    <p>Card game — coming soon</p>
-  </div>
+  <div id="setup-screen" class="screen active"></div>
+  <div id="game-screen" class="screen"></div>
+  <div id="round-end-screen" class="screen"></div>
+  <div id="game-end-screen" class="screen"></div>
+  <div id="history-screen" class="screen"></div>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

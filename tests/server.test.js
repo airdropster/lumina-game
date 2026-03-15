@@ -37,7 +37,7 @@ describe('Express server', () => {
     assert.equal(res.status, 200);
     const body = await res.text();
     assert.ok(body.includes('<title>LUMINA</title>'), 'should contain LUMINA title');
-    assert.ok(body.includes('<h1>LUMINA</h1>'), 'should contain LUMINA heading');
+    assert.ok(body.includes('setup-screen'), 'should contain setup screen element');
   });
 
   it('POST /api/stats/save saves session and returns sessionId', async () => {
