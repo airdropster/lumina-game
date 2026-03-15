@@ -1,0 +1,11 @@
+node_modules/
+data/*.db
+.git/
+.gitignore
+.superpowers/
+.omc/
+docs/
+tests/
+CLAUDE.md
+LUMINA2.docx
+*.md
