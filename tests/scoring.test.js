@@ -186,14 +186,14 @@ describe('calcPrismBonus', () => {
     assert.equal(calcPrismBonus(grid), 0);
   });
 
-  it('awards +10 per prism card in valid structures', () => {
+  it('awards +10 once even if multiple prism cards are in valid structures', () => {
     // Two prism cards each in valid columns
     const grid = makeGrid({
       '0,0': c(5, 'blue', true, true),
       '0,1': c(5, 'blue', true, true),
     });
-    // Columns 0 and 1 are valid
-    assert.equal(calcPrismBonus(grid), 20);
+    // Columns 0 and 1 are valid, but bonus is capped at +10 total
+    assert.equal(calcPrismBonus(grid), 10);
   });
 });
 

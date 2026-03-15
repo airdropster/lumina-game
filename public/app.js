@@ -9,8 +9,10 @@ import {
   renderRoundEnd,
   renderGameEnd,
   renderHistory,
-  showConfirmDialog,
+  showDeckDrawDialog,
   logAction,
+  highlightAttackTargets,
+  clearAttackHighlights,
 } from './ui.js';
 import { saveGameStats, fetchHistory } from './stats.js';
 
@@ -114,6 +116,10 @@ function handleCardClick(row, col) {
     if (card.faceUp) return;
 
     game.revealCard(0, row, col);
+
+    const cardEls = document.querySelectorAll('.player-grid .card');
+    const cardEl = cardEls[row * 4 + col];
+    if (cardEl) cardEl.classList.add('card-flip');
 
     if (player.revealsLeft === 0) {
       // All players revealed — start game
@@ -225,6 +231,9 @@ function handleCardClick(row, col) {
       logAction(document, 'Cannot secure this card. No prisms remaining?');
       return;
     }
+    const secureCardEls = document.querySelectorAll('.player-grid .card');
+    const secureCardEl = secureCardEls[row * 4 + col];
+    if (secureCardEl) secureCardEl.classList.add('prism-drop');
     endPlayerTurn();
   }
 }
@@ -265,15 +274,12 @@ function handleDeckClick() {
   }
 
   // Offer choice: place on grid or discard and reveal
-  showConfirmDialog(
-    'Draw from deck. Place it on your grid, or discard it and reveal a face-down card?',
+  showDeckDrawDialog(
     () => {
-      // Confirm = place on grid
       constructSource = 'deck';
       logAction(document, 'Click a card in your grid to replace it with the drawn card.');
     },
     () => {
-      // Cancel = discard and reveal
       constructSource = 'deck_discard';
       logAction(document, 'Click a face-down card to reveal it. The drawn card goes to discard.');
     }
@@ -316,11 +322,15 @@ function handleActionClick(action) {
   attackStep = null;
   constructSource = null;
 
+  clearAttackHighlights();
+
   if (action === 'construct') {
     logAction(document, 'CONSTRUCT: Draw from Deck or Discard pile.');
   } else if (action === 'attack') {
+    highlightAttackTargets(game, 0);
     logAction(document, 'ATTACK: Select your face-up card to swap, then an opponent\'s card, then reveal a cost card.');
   } else if (action === 'secure') {
+    clearAttackHighlights();
     logAction(document, 'SECURE: Click a face-up card to place a prism on it.');
   }
 
@@ -333,10 +343,15 @@ function endPlayerTurn() {
   selectedAction = null;
   attackStep = null;
   constructSource = null;
+  clearAttackHighlights();
 
   // Check for LUMINA flash
   if (game.luminaCaller === 0 && game.phase === PHASE.FINAL_TURNS) {
     logAction(document, 'LUMINA! You revealed all your cards!');
+    const flash = document.createElement('div');
+    flash.classList.add('lumina-flash');
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 1500);
   }
 
   // Check if round is over
@@ -393,6 +408,10 @@ function executeBotTurn() {
   // Check LUMINA
   if (game.luminaCaller === botIndex && game.phase === PHASE.FINAL_TURNS) {
     logAction(document, `${bot.name} called LUMINA!`);
+    const flash = document.createElement('div');
+    flash.classList.add('lumina-flash');
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 1500);
   }
 
   isProcessingBot = false;

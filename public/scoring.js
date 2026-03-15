@@ -110,18 +110,17 @@ export function calcPrismBonus(grid) {
     if (increasing) validRows.add(row);
   }
 
-  // Award prism bonus
-  let bonus = 0;
+  // Award prism bonus: +10 once if any prismed card is in a valid structure
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 4; col++) {
       const card = grid[row][col];
       if (card.hasPrism && (validCols.has(col) || validRows.has(row))) {
-        bonus += 10;
+        return 10;
       }
     }
   }
 
-  return bonus;
+  return 0;
 }
 
 /**

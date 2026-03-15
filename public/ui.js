@@ -251,18 +251,11 @@ export function renderGameBoard(container, game, callbacks) {
   // ── Bot Zone ──
   const botZone = el('div', 'bot-zone');
 
-  // Track active bot tab (default first bot)
-  let activeBotIndex = 0;
-
-  const botTabs = [];
-  const botGridContainers = [];
-
   for (let b = 1; b < game.players.length; b++) {
     const bot = game.players[b];
-    const botIndex = b - 1;
 
-    const tab = el('div', ['bot-tab', botIndex === activeBotIndex ? 'active' : '']);
-    tab.setAttribute('role', 'tab');
+    const tab = el('div', 'bot-tab');
+    tab.setAttribute('role', 'region');
     tab.setAttribute('aria-label', `${bot.name} - ${bot.difficulty}`);
 
     // Bot name + score header
@@ -278,9 +271,6 @@ export function renderGameBoard(container, game, callbacks) {
 
     // Bot grid (3 rows x 4 cols)
     const gridDiv = el('div', 'bot-grid');
-    if (botIndex !== activeBotIndex) {
-      gridDiv.style.display = 'none';
-    }
 
     for (let r = 0; r < 3; r++) {
       for (let c = 0; c < 4; c++) {
@@ -295,22 +285,7 @@ export function renderGameBoard(container, game, callbacks) {
       }
     }
 
-    botGridContainers.push(gridDiv);
     tab.appendChild(gridDiv);
-
-    tab.addEventListener('click', (e) => {
-      // Don't switch tab if clicking on a card
-      if (e.target.classList.contains('card')) return;
-
-      activeBotIndex = botIndex;
-      botTabs.forEach((t, i) => {
-        t.classList.toggle('active', i === botIndex);
-        botGridContainers[i].style.display = i === botIndex ? '' : 'none';
-      });
-      callbacks.onBotTabClick(b);
-    });
-
-    botTabs.push(tab);
     botZone.appendChild(tab);
   }
 
@@ -875,6 +850,104 @@ export function showConfirmDialog(message, onConfirm, onCancel) {
     }
   };
   document.addEventListener('keydown', escHandler);
+}
+
+// ── showDeckDrawDialog ─────────────────────────────────────────────────
+
+/**
+ * Show a modal dialog for choosing what to do with a drawn deck card.
+ * @param {function(): void} onPlace – called when player chooses to place on grid
+ * @param {function(): void} onDiscard – called when player chooses to discard and reveal
+ */
+export function showDeckDrawDialog(onPlace, onDiscard) {
+  const overlay = el('div', 'confirm-overlay');
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+
+  const dialog = el('div', 'confirm-dialog');
+
+  const heading = el('h3');
+  heading.textContent = 'Draw from Deck';
+  dialog.appendChild(heading);
+
+  const msg = el('p');
+  msg.textContent = 'Choose what to do with the drawn card';
+  dialog.appendChild(msg);
+
+  const actions = el('div', 'dialog-actions');
+
+  const placeBtn = el('button', 'btn-confirm');
+  placeBtn.textContent = 'PLACE ON GRID';
+  placeBtn.addEventListener('click', () => {
+    overlay.remove();
+    document.removeEventListener('keydown', escHandler);
+    onPlace();
+  });
+  actions.appendChild(placeBtn);
+
+  const discardBtn = el('button', 'btn-cancel');
+  discardBtn.textContent = 'DISCARD & REVEAL';
+  discardBtn.addEventListener('click', () => {
+    overlay.remove();
+    document.removeEventListener('keydown', escHandler);
+    onDiscard();
+  });
+  actions.appendChild(discardBtn);
+
+  dialog.appendChild(actions);
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  placeBtn.focus();
+
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      overlay.remove();
+      document.removeEventListener('keydown', escHandler);
+    }
+  };
+  document.addEventListener('keydown', escHandler);
+}
+
+// ── Attack Target Highlights ───────────────────────────────────────────
+
+/**
+ * Highlight valid attack targets on opponent grids.
+ * @param {object} game – game state
+ * @param {number} playerIndex – the attacking player's index
+ */
+export function highlightAttackTargets(game, playerIndex) {
+  clearAttackHighlights();
+  const botTabs = document.querySelectorAll('.bot-tab');
+
+  for (let di = 0; di < game.players.length; di++) {
+    if (di === playerIndex) continue;
+    const defender = game.players[di];
+    const botTab = botTabs[di - 1];
+    if (!botTab) continue;
+    const gridEl = botTab.querySelector('.bot-grid');
+    if (!gridEl) continue;
+    const cards = gridEl.children;
+
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 4; c++) {
+        const card = defender.grid[r][c];
+        if (card.faceUp && !card.hasPrism && !card.immune) {
+          const idx = r * 4 + c;
+          if (cards[idx]) cards[idx].classList.add('attack-target');
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Remove all attack-target highlights from the DOM.
+ */
+export function clearAttackHighlights() {
+  document.querySelectorAll('.attack-target').forEach((node) => {
+    node.classList.remove('attack-target');
+  });
 }
 
 // ── logAction ──────────────────────────────────────────────────────────

@@ -363,13 +363,33 @@ function chooseMediumAction(game, playerIndex) {
  *   - risk_of_revealing_bad_card x 1.2
  */
 function chooseHardAction(game, playerIndex) {
+  const grid = game.players[playerIndex].grid;
+  const faceDown = getFaceDownPositions(grid);
+
+  // ── LUMINA urgency ──
+  // When close to revealing all cards, boost actions that reveal face-down cards.
+  // LUMINA is auto-detected by the game engine when all cards are face-up,
+  // so the bot just needs to prioritize revealing its remaining face-down cards.
+  let luminaUrgency = 0;
+  if (faceDown.length === 1) luminaUrgency = 3.0;
+  else if (faceDown.length === 2) luminaUrgency = 1.5;
+
+  // ── Opponent LUMINA threat ──
+  // Check if any opponent is close to calling LUMINA (1-2 face-down)
+  const threateningOpponents = new Set();
+  for (let i = 0; i < game.players.length; i++) {
+    if (i === playerIndex) continue;
+    const oppFaceDown = getFaceDownPositions(game.players[i].grid);
+    if (oppFaceDown.length <= 2) threateningOpponents.add(i);
+  }
+
   const candidates = [];
 
   // Generate all possible construct actions
-  candidates.push(...generateConstructCandidates(game, playerIndex));
+  candidates.push(...generateConstructCandidates(game, playerIndex, luminaUrgency));
 
   // Generate all possible attack actions
-  candidates.push(...generateAttackCandidates(game, playerIndex));
+  candidates.push(...generateAttackCandidates(game, playerIndex, luminaUrgency, threateningOpponents));
 
   // Generate all possible secure actions
   candidates.push(...generateSecureCandidates(game, playerIndex));
@@ -384,7 +404,7 @@ function chooseHardAction(game, playerIndex) {
   return candidates[0].action;
 }
 
-function generateConstructCandidates(game, playerIndex) {
+function generateConstructCandidates(game, playerIndex, luminaUrgency = 0) {
   const player = game.players[playerIndex];
   const grid = player.grid;
   const candidates = [];
@@ -413,7 +433,7 @@ function generateConstructCandidates(game, playerIndex) {
       // Replacing face-down: assume average hidden value of ~6
       const valueDelta = discard.value - 6;
       const structureBonus = evalStructureBonusPotential(grid, r, c, discard);
-      const utility = valueDelta * 1.0 + structureBonus * 1.5;
+      const utility = valueDelta * 1.0 + structureBonus * 1.5 + luminaUrgency;
 
       candidates.push({
         utility,
@@ -441,8 +461,8 @@ function generateConstructCandidates(game, playerIndex) {
     }
 
     for (const [r, c] of faceDown) {
-      // Replacing unknown with unknown: small positive (reveals a card)
-      const utility = 0.5; // slight preference for revealing
+      // Replacing unknown with unknown: reveals a card + LUMINA urgency
+      const utility = 0.5 + luminaUrgency;
       candidates.push({
         utility,
         action: { type: 'construct', source: 'deck', row: r, col: c },
@@ -454,8 +474,8 @@ function generateConstructCandidates(game, playerIndex) {
   {
     const faceDown = getFaceDownPositions(grid);
     for (const [r, c] of faceDown) {
-      // Value of revealing is modest
-      const utility = 0.2;
+      // Value of revealing + LUMINA urgency
+      const utility = 0.2 + luminaUrgency;
       candidates.push({
         utility,
         action: {
@@ -471,7 +491,7 @@ function generateConstructCandidates(game, playerIndex) {
   return candidates;
 }
 
-function generateAttackCandidates(game, playerIndex) {
+function generateAttackCandidates(game, playerIndex, luminaUrgency = 0, threateningOpponents = new Set()) {
   const available = game.getAvailableActions(playerIndex);
   if (!available.includes('attack')) return [];
 
@@ -506,8 +526,12 @@ function generateAttackCandidates(game, playerIndex) {
       // Pick a random cost position
       const [costR, costC] = pickRandom(costPositions);
 
+      // LUMINA bonuses: urgency for revealing a face-down + threat disruption
+      const luminaRevealBonus = luminaUrgency * 0.5;
+      const threatBonus = threateningOpponents.has(target.defenderIndex) ? 2.0 : 0;
+
       const utility =
-        valueDelta * 1.0 + disruption * 0.8 - risk * 1.2;
+        valueDelta * 1.0 + disruption * 0.8 - risk * 1.2 + luminaRevealBonus + threatBonus;
 
       candidates.push({
         utility,

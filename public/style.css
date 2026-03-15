@@ -885,6 +885,19 @@ button {
   box-shadow: 0 0 12px rgba(34, 211, 238, 0.4);
 }
 
+/* -- Attack target highlight -- */
+.card.attack-target {
+  box-shadow: 0 0 12px 3px #ff3c4a, inset 0 0 8px rgba(255, 0, 60, 0.15);
+  border-color: #ff3c4a;
+  cursor: pointer;
+  animation: pulse-glow 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 12px 3px #ff3c4a, inset 0 0 8px rgba(255, 0, 60, 0.15); }
+  50% { box-shadow: 0 0 20px 6px #ff3c4a, inset 0 0 12px rgba(255, 0, 60, 0.25); }
+}
+
 /* -- Empty grid slot -- */
 .card-slot {
   width: var(--card-w);
