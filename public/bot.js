@@ -52,17 +52,22 @@ function getVisiblePositions(grid) {
  */
 function findLowestVisible(grid) {
   let minVal = Infinity;
-  let minPos = null;
+  const candidates = [];
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 4; c++) {
       const card = grid[r][c];
-      if (card.faceUp && !card.hasPrism && card.value < minVal) {
-        minVal = card.value;
-        minPos = [r, c];
+      if (card.faceUp && !card.hasPrism) {
+        if (card.value < minVal) {
+          minVal = card.value;
+          candidates.length = 0;
+          candidates.push([r, c]);
+        } else if (card.value === minVal) {
+          candidates.push([r, c]);
+        }
       }
     }
   }
-  return minPos;
+  return candidates.length > 0 ? pickRandom(candidates) : null;
 }
 
 /**
@@ -70,17 +75,22 @@ function findLowestVisible(grid) {
  */
 function findHighestVisible(grid) {
   let maxVal = -Infinity;
-  let maxPos = null;
+  const candidates = [];
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 4; c++) {
       const card = grid[r][c];
-      if (card.faceUp && !card.hasPrism && card.value > maxVal) {
-        maxVal = card.value;
-        maxPos = [r, c];
+      if (card.faceUp && !card.hasPrism) {
+        if (card.value > maxVal) {
+          maxVal = card.value;
+          candidates.length = 0;
+          candidates.push([r, c]);
+        } else if (card.value === maxVal) {
+          candidates.push([r, c]);
+        }
       }
     }
   }
-  return maxPos;
+  return candidates.length > 0 ? pickRandom(candidates) : null;
 }
 
 /**
@@ -266,7 +276,7 @@ export function chooseBotReveal(game, playerIndex) {
   }
 
   // Hard: Pick pair with highest information value
-  // Corners = 3, edges = 2, center = 1
+  // Corners = 3, edges = 2, center = 1 — with randomness for ties
   const infoValue = (r, c) => {
     const isCorner = (r === 0 || r === 2) && (c === 0 || c === 3);
     const isEdge = (r === 0 || r === 2 || c === 0 || c === 3);
@@ -275,35 +285,35 @@ export function chooseBotReveal(game, playerIndex) {
     return 1;
   };
 
-  let bestPair = null;
-  let bestScore = -Infinity;
-
+  // Score all pairs
+  const scoredPairs = [];
   for (let i = 0; i < faceDown.length; i++) {
     for (let j = i + 1; j < faceDown.length; j++) {
       const [r1, c1] = faceDown[i];
       const [r2, c2] = faceDown[j];
       let score = infoValue(r1, c1) + infoValue(r2, c2);
 
-      // Tiebreak: prefer positions in columns with face-up cards of the same color
-      // Check column color density as a bonus
       for (const [r, c] of [faceDown[i], faceDown[j]]) {
         for (let row = 0; row < 3; row++) {
           if (row === r) continue;
           const other = grid[row][c];
           if (other.faceUp && other.color && other.color !== 'multicolor' && other.color !== null) {
-            score += 0.1; // small bonus for color information
+            score += 0.1;
           }
         }
       }
 
-      if (score > bestScore) {
-        bestScore = score;
-        bestPair = [faceDown[i], faceDown[j]];
-      }
+      scoredPairs.push({ pair: [faceDown[i], faceDown[j]], score });
     }
   }
 
-  return bestPair || [faceDown[0], faceDown[1]];
+  if (scoredPairs.length === 0) return [faceDown[0], faceDown[1]];
+
+  // Find max score and randomly pick among ties
+  const maxScore = Math.max(...scoredPairs.map((p) => p.score));
+  const topPairs = scoredPairs.filter((p) => p.score >= maxScore - 0.01);
+  const pick = topPairs[Math.floor(Math.random() * topPairs.length)];
+  return pick.pair;
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -678,8 +688,8 @@ function generateAllCandidateActions(game, playerIndex) {
   // ── Attack: all valid attacker-target-cost combinations ──
   if (available.includes('attack') && faceDown.length > 0 && visibleUnprismed.length > 0) {
     const targets = getValidAttackTargets(game, playerIndex);
-    // Limit combinatorial explosion: pick best cost position (first facedown)
-    const costPos = faceDown[0];
+    // Limit combinatorial explosion: pick a random cost position
+    const costPos = pickRandom(faceDown);
 
     for (const target of targets) {
       for (const [ar, ac] of visibleUnprismed) {
