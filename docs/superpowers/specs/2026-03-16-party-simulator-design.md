@@ -20,10 +20,10 @@ A standalone parameter sandbox page (`/simulator`) where users configure game ru
 
 ### Modified Files
 
-- **`server.js`** — Add static serving for `simulator.html` at `/simulator` route
+- **`server.js`** — Add explicit `app.get('/simulator', ...)` route that serves `public/simulator.html`
 - **`public/cards.js`** — `createDeck(config)` accepts optional config to override card values/counts
-- **`public/game.js`** — `createGame(opts)` accepts optional `config` for win threshold and bonus values
-- **`public/scoring.js`** — `calcRoundScore(grid, config)` accepts optional config for bonus values
+- **`public/game.js`** — `createGame(opts)` accepts optional `config` for win threshold and bonus values; new `allBots` flag to create all-bot games (no human player)
+- **`public/scoring.js`** — `calcRoundScore(grid, config)` accepts optional config for bonus values; sub-functions `calcColumnBonus(grid, config)`, `calcRowBonus(grid, config)`, `calcPrismBonus(grid, config)` all gain the optional `config` parameter
 
 ### No Changes To
 
@@ -46,6 +46,7 @@ A standalone parameter sandbox page (`/simulator`) where users configure game ru
 | Column bonus | `columnBonus` | 10 | 0–50 | `scoring.js` calcColumnBonus |
 | Row bonus | `rowBonus` | 10 | 0–50 | `scoring.js` calcRowBonus |
 | Prism bonus | `prismBonus` | 10 | 0–50 | `scoring.js` calcPrismBonus |
+| LUMINA bonus/penalty | `luminaBonus` | 10 | 0–50 | `game.js` scoreRound caller bonus/penalty |
 | Number of games | `gameCount` | 100 | 10–1000 | Simulation loop |
 | Bot difficulties | `difficulties[]` | all hard | per-bot: easy/medium/hard | `game.js` + `bot.js` |
 
@@ -61,6 +62,7 @@ const config = {
   columnBonus: 10,
   rowBonus: 10,
   prismBonus: 10,
+  luminaBonus: 10,
 };
 ```
 
@@ -83,19 +85,22 @@ With config:
 - Colorless cards: value `config.topValue`, count 8
 - Total deck size changes with card range (affects dealing feasibility — see Constraints below)
 
-### `game.js` — `createGame({ botCount, botDifficulties, config })`
+### `game.js` — `createGame({ botCount, botDifficulties, config, allBots })`
 
+- **`allBots` flag**: When `true`, all players are bots (no human player 0). The player array contains `botCount` bots, each named `Bot 1`, `Bot 2`, etc., all with `isBot: true`. When `false` or omitted, behaves exactly as before (1 human + botCount bots).
 - Passes `config` to `createDeck(config)`
 - Stores `config` on the game object so `scoreRound()` can access it
-- `isGameOver()` uses `config.winThreshold` instead of hardcoded 200
-- `scoreRound()` passes `config` to `calcRoundScore()`
+- `isGameOver()` uses `config?.winThreshold ?? 200` instead of hardcoded 200
+- `scoreRound()` passes `config` to `calcRoundScore()` and uses `config?.luminaBonus ?? 10` for the LUMINA caller +/- bonus/penalty
 
 ### `scoring.js` — `calcRoundScore(grid, config)`
 
-- `calcColumnBonus()` returns `config.columnBonus` instead of hardcoded 10
-- `calcRowBonus()` returns `config.rowBonus` instead of hardcoded 10
-- `calcPrismBonus()` returns `config.prismBonus` instead of hardcoded 10
-- LUMINA caller bonus/penalty also uses a configurable value (defaults to 10)
+All sub-functions gain the optional `config` parameter using the same `?? default` pattern:
+
+- `calcColumnBonus(grid, config)` returns `config?.columnBonus ?? 10` per valid column
+- `calcRowBonus(grid, config)` returns `config?.rowBonus ?? 10` per valid row
+- `calcPrismBonus(grid, config)` returns `config?.prismBonus ?? 10` when applicable
+- `calcRoundScore(grid, config)` threads `config` to all sub-functions
 
 ### Backwards Compatibility
 
@@ -135,13 +140,51 @@ export function runSimulation(params) { ... }
 
 ### Game Loop (per game)
 
-1. `createGame({ botCount: playerCount, botDifficulties: difficulties, config })` — all players are bots (no human)
-2. Auto-reveal: each bot reveals 2 cards via `chooseBotReveal()`
+1. `createGame({ botCount: playerCount, botDifficulties: difficulties, config, allBots: true })` — all players are bots
+2. Auto-reveal: each bot reveals 2 cards via `chooseBotReveal(game, botIndex)`
 3. `game.startGame()` to determine first player
-4. Loop: `chooseBotAction(game, currentPlayerIndex)` → execute action → check LUMINA → check scoring → check game over
-5. After each round: `game.scoreRound()`, check `game.isGameOver()`
-6. If not over: start new round (fresh deck/grids, keep cumulative scores)
-7. Collect per-round stats: scores, breakdowns, LUMINA calls, round count
+4. **Turn loop**: `chooseBotAction(game, game.currentPlayerIndex)` → dispatch action → repeat until `game.phase === PHASE.SCORING`
+5. After scoring phase: `game.scoreRound()`, collect round stats, check `game.isGameOver()`
+6. If not over: start new round (see New Round Mechanics below)
+7. If over or round cap (50) reached: record game results
+
+### Action Dispatch
+
+The simulation engine must map bot action objects to game methods, replicating the logic from `app.js:438-455`:
+
+```js
+function executeAction(game, botIndex, action) {
+  if (action.type === 'construct') {
+    if (action.source === 'discard') {
+      game.constructFromDiscard(botIndex, action.row, action.col);
+    } else if (action.source === 'deck_discard') {
+      game.constructDiscardDraw(botIndex, action.revealRow, action.revealCol);
+    } else {
+      game.constructFromDeck(botIndex, action.row, action.col);
+    }
+  } else if (action.type === 'attack') {
+    game.attack(
+      botIndex,
+      action.attackerRow, action.attackerCol,
+      action.defenderIndex, action.defenderRow, action.defenderCol,
+      action.revealRow, action.revealCol
+    );
+  } else if (action.type === 'secure') {
+    game.secure(botIndex, action.row, action.col);
+  }
+}
+```
+
+### New Round Mechanics
+
+There is no `game.startNewRound()` method. The simulation engine must replicate what `app.js:557-568` does:
+
+1. Save `game.cumulativeScores` and `game.round`
+2. Create a fresh game: `createGame({ botCount: playerCount, botDifficulties: difficulties, config, allBots: true })`
+3. Transplant saved state: `game.cumulativeScores = savedScores; game.round = savedRound + 1`
+4. Re-run bot reveals for all players via `chooseBotReveal(game, i)`
+5. Call `game.startGame()` to determine first player for the new round
+6. Resume the turn loop
 
 ### Results Shape
 
@@ -207,10 +250,11 @@ Grouped sections with section headers:
 
 1. **Card Values**: Normal range (min/max inputs), Negative card value, Top card value
 2. **Game Rules**: Number of players (2–6), Win threshold
-3. **Bonus Values**: Column, Row, Prism (3 inputs in a row)
+3. **Bonus Values**: Column, Row, Prism, LUMINA (4 inputs, 2x2 grid)
 4. **Simulation**: Number of games (slider + input), Bot difficulties (per-bot dropdown)
 5. **Run Simulation** button (white primary, full-width)
-6. **Progress bar** (appears during simulation)
+6. **Reset Defaults** button (ghost/secondary, full-width) — restores all parameters to their default values
+7. **Progress bar** (appears during simulation)
 
 ### Right Panel — Results
 
@@ -218,7 +262,7 @@ Grouped sections with section headers:
    - Games played
    - Average rounds per game
    - LUMINA call rate (% of rounds)
-   - Average game duration (computed time)
+   - Average winning score
 
 2. **Win Rate bar chart** (Chart.js bar):
    - X-axis: player names with difficulty badges
@@ -268,7 +312,7 @@ Before running: right panel shows a centered message "Configure parameters and r
 ## Constraints & Edge Cases
 
 - **Deck size vs players**: With `cardMin=1, cardMax=12`: 96 + 8 + 8 = 112 cards. Each player needs 12 + some for discard/draws. Max 6 players need ~80+ cards minimum. If user shrinks card range too much (e.g., 1-3 = 24 + 16 = 40 cards for 6 players needing 72+), show a validation warning and prevent running.
-- **Minimum deck formula**: `(playerCount * 12) + 1 (initial discard)` must be ≤ total deck size
+- **Minimum deck formula**: `(playerCount * 12) + 1 (initial discard)` must be ≤ total deck size. This is the absolute minimum for dealing — very tight decks will trigger frequent reshuffles via the existing `_reshuffleDeck()` mechanism but still function correctly.
 - **Infinite games**: If win threshold is very high and scores are very low, games could run forever. Cap at 50 rounds per game — if no winner, declare highest scorer the winner.
 - **Bot AI with custom values**: Bots use relative comparisons (highest value, lowest value), so they adapt naturally to different card ranges. Hard bot's Monte Carlo evaluations work on actual values, so custom ranges don't break the logic.
 
