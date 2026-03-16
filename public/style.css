@@ -521,19 +521,20 @@ button {
 .prism-count {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-1);
-  padding: var(--sp-1) var(--sp-3);
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
   background: rgba(34, 211, 238, 0.1);
   border: 1px solid rgba(34, 211, 238, 0.3);
   border-radius: 20px;
-  font-size: 0.7rem;
+  font-size: 1rem;
+  font-weight: 700;
   color: var(--prism-cyan);
   text-shadow: var(--prism-glow);
 }
 
 .prism-count::before {
-  content: '\u25C6';
-  font-size: 0.65rem;
+  content: '\25C6';
+  font-size: 0.9rem;
 }
 
 .player-grid {
@@ -849,23 +850,7 @@ button {
   animation: prism-glow 2.5s ease-in-out infinite;
 }
 
-.card.prismed::after {
-  content: '◆';
-  position: absolute;
-  top: 2px;
-  right: 3px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: #22d3ee;
-  text-shadow: 0 0 6px rgba(34, 211, 238, 0.9), 0 0 12px rgba(34, 211, 238, 0.5);
-  animation: prism-pulse 2s ease-in-out infinite;
-}
-
-.bot-grid .card.prismed::after {
-  font-size: 0.45rem;
-  top: 1px;
-  right: 2px;
-}
+/* prismed card — glow only, no corner badge */
 
 @keyframes prism-glow {
   0%, 100% { box-shadow: 0 0 10px rgba(34, 211, 238, 0.4), inset 0 0 6px rgba(34, 211, 238, 0.15); }
