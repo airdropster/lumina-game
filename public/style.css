@@ -1379,7 +1379,6 @@ button {
   color: var(--text-primary);
   text-align: center;
   margin-bottom: var(--sp-6);
-  text-shadow: 0 0 12px rgba(96, 165, 250, 0.3);
 }
 
 .history-table {
@@ -1502,7 +1501,6 @@ button {
 
 .confirm-dialog .btn-confirm:hover {
   background: rgba(239, 68, 68, 0.25);
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
 }
 
 .confirm-dialog .btn-cancel {
@@ -1544,11 +1542,11 @@ button {
 .text-center { text-align: center; }
 .text-right  { text-align: right; }
 
-.text-glow-blue   { text-shadow: 0 0 8px rgba(96, 165, 250, 0.5); }
-.text-glow-violet { text-shadow: 0 0 8px rgba(167, 139, 250, 0.5); }
-.text-glow-orange { text-shadow: 0 0 8px rgba(251, 146, 60, 0.5); }
-.text-glow-green  { text-shadow: 0 0 8px rgba(74, 222, 128, 0.5); }
-.text-glow-cyan   { text-shadow: 0 0 8px rgba(34, 211, 238, 0.5); }
+.text-glow-blue   { color: rgba(96, 165, 250, 0.9); }
+.text-glow-violet { color: rgba(167, 139, 250, 0.9); }
+.text-glow-orange { color: rgba(251, 146, 60, 0.9); }
+.text-glow-green  { color: rgba(74, 222, 128, 0.9); }
+.text-glow-cyan   { color: rgba(34, 211, 238, 0.9); }
 
 .mt-4 { margin-top: var(--sp-4); }
 .mt-6 { margin-top: var(--sp-6); }
@@ -1571,7 +1569,7 @@ button {
 .action-highlight { animation: action-highlight-fade 0.8s ease-out forwards; }
 
 /* -- 1B. Turn Banner -- */
-.turn-banner { width: 100%; text-align: center; padding: 10px 16px; font-family: var(--font-mono); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.05em; border-radius: 6px; margin-bottom: 8px; }
+.turn-banner { width: 100%; text-align: center; padding: 10px 16px; font-weight: 700; font-size: 0.95rem; letter-spacing: 0.05em; border-radius: 6px; margin-bottom: 8px; }
 .turn-banner--player { color: var(--prism-cyan, #22d3ee); border: 2px solid var(--prism-cyan, #22d3ee); background: rgba(34, 211, 238, 0.08); animation: pulse-border 1.5s ease-in-out infinite; }
 .turn-banner--bot { color: var(--text-secondary); border: 1px solid var(--border-default); background: var(--bg-surface-raised); }
 .turn-banner--reveal { color: #4ade80; border: 2px solid #4ade80; background: rgba(74, 222, 128, 0.08); }
@@ -1581,19 +1579,8 @@ button {
 
 /* -- 1C. Scoreboard -- */
 .scoreboard { display: flex; justify-content: center; gap: 12px; padding: 6px 16px; flex-wrap: wrap; margin-bottom: 8px; }
-.scoreboard-entry { padding: 4px 12px; border-radius: 20px; font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600; border: 1px solid var(--border-default); background: var(--bg-surface-raised); color: var(--text-secondary); }
+.scoreboard-entry { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; border: 1px solid var(--border-default); background: var(--bg-surface-raised); color: var(--text-secondary); }
 .scoreboard-entry--active { border-color: var(--prism-cyan, #22d3ee); color: var(--text-primary); background: rgba(34, 211, 238, 0.1); }
-
-/* Reduced motion preference */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
 
 /* ------------------------------------------------------------
    13. RESPONSIVE DESIGN
@@ -1771,6 +1758,14 @@ button {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* ------------------------------------------------------------
    15. STATS DASHBOARD
    ------------------------------------------------------------ */
@@ -1798,7 +1793,6 @@ button {
 .stat-value {
   font-size: 2rem;
   font-weight: 700;
-  font-family: var(--font-mono);
   color: var(--prism-cyan, #22d3ee);
 }
 
@@ -1818,7 +1812,6 @@ button {
   color: var(--text-secondary);
   border-radius: 4px;
   cursor: pointer;
-  font-family: var(--font-mono);
 }
 
 .btn-stats:hover {
@@ -1840,7 +1833,6 @@ button {
   border: 1px solid var(--border-default);
   border-radius: 12px;
   color: var(--text-primary);
-  font-family: var(--font-mono);
   font-size: 0.8rem;
   line-height: 1.6;
   max-height: 80vh;
@@ -1879,7 +1871,6 @@ button {
   color: var(--text-secondary);
   font-size: 0.85rem;
   cursor: pointer;
-  font-family: var(--font-mono);
   font-weight: 700;
   display: flex;
   align-items: center;

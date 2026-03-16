@@ -159,11 +159,11 @@ export function renderSetupScreen(container, onStart, onViewStats) {
     btn.textContent = String(i);
     btn.style.flex = '1';
     btn.style.padding = 'var(--sp-3)';
-    btn.style.background = i === selectedBotCount ? 'rgba(96, 165, 250, 0.3)' : 'var(--bg-surface-raised)';
+    btn.style.background = i === selectedBotCount ? 'rgba(96, 165, 250, 0.25)' : 'var(--bg-surface-raised)';
     btn.style.border = i === selectedBotCount ? '2px solid var(--card-blue-border)' : '1px solid var(--border-default)';
     btn.style.borderRadius = '6px';
     btn.style.color = 'var(--text-primary)';
-    btn.style.fontFamily = 'var(--font-mono)';
+    btn.style.fontFamily = 'var(--font-sans)';
     btn.style.fontSize = '0.9rem';
     btn.style.fontWeight = '700';
     btn.style.cursor = 'pointer';
@@ -173,7 +173,7 @@ export function renderSetupScreen(container, onStart, onViewStats) {
       selectedBotCount = i;
       countButtons.forEach((b, idx) => {
         const active = idx + 1 === i;
-        b.style.background = active ? 'rgba(96, 165, 250, 0.3)' : 'var(--bg-surface-raised)';
+        b.style.background = active ? 'rgba(96, 165, 250, 0.25)' : 'var(--bg-surface-raised)';
         b.style.border = active ? '2px solid var(--card-blue-border)' : '1px solid var(--border-default)';
       });
       renderBotConfigs();
