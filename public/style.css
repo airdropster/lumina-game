@@ -160,30 +160,28 @@ button {
 .setup-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
-  border-radius: 16px;
+  border-radius: 12px;
   padding: var(--sp-10) var(--sp-8);
   max-width: 480px;
   width: 100%;
-  box-shadow:
-    0 0 40px rgba(26, 10, 46, 0.6),
-    0 0 80px rgba(96, 165, 250, 0.05);
   text-align: center;
 }
 
 .setup-card h1 {
-  font-size: 2.5rem;
-  letter-spacing: 0.3em;
+  font-size: 2rem;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--text-primary);
-  text-shadow: 0 0 20px rgba(96, 165, 250, 0.5), 0 0 40px rgba(167, 139, 250, 0.3);
+  font-weight: 700;
   margin-bottom: var(--sp-8);
 }
 
 .setup-card h2 {
-  font-size: 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.1em;
   margin-bottom: var(--sp-6);
 }
 
@@ -209,7 +207,7 @@ button {
   border: 1px solid var(--border-default);
   border-radius: 6px;
   color: var(--text-primary);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 0.875rem;
   transition: border-color var(--t-fast);
 }
@@ -253,32 +251,26 @@ button {
   border: 1px solid var(--border-default);
   border-radius: 4px;
   color: var(--text-primary);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 0.8rem;
 }
 
 .btn-start {
   width: 100%;
   padding: var(--sp-4) var(--sp-6);
-  background: linear-gradient(135deg, var(--card-blue-border), var(--card-violet-border));
-  color: white;
-  font-size: 1.1rem;
-  font-weight: 700;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
-  border-radius: 8px;
-  transition: all var(--t-normal);
-  box-shadow: 0 0 15px rgba(96, 165, 250, 0.3);
+  letter-spacing: 0.1em;
+  border-radius: 6px;
+  transition: background var(--t-fast);
   margin-top: var(--sp-4);
 }
 
 .btn-start:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 25px rgba(96, 165, 250, 0.5), 0 0 50px rgba(167, 139, 250, 0.2);
-}
-
-.btn-start:active {
-  transform: translateY(0) scale(0.98);
+  background: #e2e8f0;
 }
 
 /* ------------------------------------------------------------
@@ -308,7 +300,6 @@ button {
   letter-spacing: 0.25em;
   text-transform: uppercase;
   color: var(--text-primary);
-  text-shadow: 0 0 12px rgba(96, 165, 250, 0.4);
 }
 
 .header-bar .round-info {
@@ -331,7 +322,6 @@ button {
 .header-bar .score-display .score-value {
   font-weight: 700;
   color: var(--card-orange-border);
-  text-shadow: 0 0 8px rgba(251, 146, 60, 0.4);
 }
 
 /* -- 5b. Bot Zone -- */
@@ -348,7 +338,7 @@ button {
   flex: 0 0 auto;
   min-width: 180px;
   padding: var(--sp-3);
-  background: var(--bg-surface);
+  background: var(--bg-surface-raised);
   border: 1px solid var(--border-default);
   border-radius: 8px;
   cursor: pointer;
@@ -361,7 +351,6 @@ button {
 
 .bot-tab.active {
   border-color: var(--card-violet-border);
-  box-shadow: 0 0 10px rgba(167, 139, 250, 0.2);
 }
 
 .bot-tab .bot-name {
@@ -488,7 +477,6 @@ button {
 .player-info .player-score {
   font-weight: 700;
   color: var(--card-orange-border);
-  text-shadow: 0 0 6px rgba(251, 146, 60, 0.3);
 }
 
 .prism-count {
@@ -502,7 +490,6 @@ button {
   font-size: 1rem;
   font-weight: 700;
   color: var(--prism-cyan);
-  text-shadow: var(--prism-glow);
 }
 
 .prism-count::before {
@@ -530,106 +517,73 @@ button {
 }
 
 .action-btn {
-  padding: var(--sp-3) var(--sp-6);
+  padding: 8px 16px;
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.05em;
   border-radius: 6px;
-  border: 2px solid transparent;
+  border: 1px solid transparent;
+  background: transparent;
   transition: all var(--t-fast);
-  position: relative;
-  overflow: hidden;
-}
-
-.action-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity var(--t-fast);
-}
-
-.action-btn:hover::before {
-  opacity: 1;
-}
-
-.action-btn:active {
-  transform: scale(0.95);
 }
 
 /* Construct */
 .action-btn.btn-construct {
-  background: rgba(96, 165, 250, 0.15);
-  border-color: var(--btn-construct);
-  color: var(--btn-construct);
-  box-shadow: 0 0 8px rgba(96, 165, 250, 0.2);
+  border-color: rgba(96, 165, 250, 0.4);
+  color: #60a5fa;
 }
 
 .action-btn.btn-construct:hover {
-  background: rgba(96, 165, 250, 0.25);
-  box-shadow: 0 0 16px rgba(96, 165, 250, 0.4), 0 0 32px rgba(96, 165, 250, 0.15);
+  background: rgba(96, 165, 250, 0.1);
 }
 
 /* Attack */
 .action-btn.btn-attack {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: var(--btn-attack);
-  color: var(--btn-attack);
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
 }
 
 .action-btn.btn-attack:hover {
-  background: rgba(239, 68, 68, 0.25);
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.4), 0 0 32px rgba(239, 68, 68, 0.15);
+  background: rgba(239, 68, 68, 0.1);
 }
 
 /* Secure */
 .action-btn.btn-secure {
-  background: rgba(74, 222, 128, 0.15);
-  border-color: var(--btn-secure);
-  color: var(--btn-secure);
-  box-shadow: 0 0 8px rgba(74, 222, 128, 0.2);
+  border-color: rgba(74, 222, 128, 0.4);
+  color: #4ade80;
 }
 
 .action-btn.btn-secure:hover {
-  background: rgba(74, 222, 128, 0.25);
-  box-shadow: 0 0 16px rgba(74, 222, 128, 0.4), 0 0 32px rgba(74, 222, 128, 0.15);
+  background: rgba(74, 222, 128, 0.1);
 }
 
 /* Selected (active action) state */
 .action-btn.selected {
-  transform: scale(1.08);
-  border-width: 3px;
-  filter: brightness(1.3);
-  z-index: 1;
+  border-width: 2px;
+  color: #fff;
 }
 
 .action-btn.btn-construct.selected {
-  background: rgba(96, 165, 250, 0.35);
-  box-shadow: 0 0 20px rgba(96, 165, 250, 0.5), 0 0 40px rgba(96, 165, 250, 0.2), inset 0 0 12px rgba(96, 165, 250, 0.15);
-  color: #fff;
+  background: rgba(96, 165, 250, 0.25);
+  border-color: #60a5fa;
 }
 
 .action-btn.btn-attack.selected {
-  background: rgba(239, 68, 68, 0.35);
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.5), 0 0 40px rgba(239, 68, 68, 0.2), inset 0 0 12px rgba(239, 68, 68, 0.15);
-  color: #fff;
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
 }
 
 .action-btn.btn-secure.selected {
-  background: rgba(74, 222, 128, 0.35);
-  box-shadow: 0 0 20px rgba(74, 222, 128, 0.5), 0 0 40px rgba(74, 222, 128, 0.2), inset 0 0 12px rgba(74, 222, 128, 0.15);
-  color: #fff;
+  background: rgba(74, 222, 128, 0.25);
+  border-color: #4ade80;
 }
 
 /* Disabled state */
 .action-btn.disabled,
 .action-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.5;
   pointer-events: none;
-  filter: grayscale(0.7);
-  box-shadow: none;
 }
 
 /* -- 5f. Action Log -- */
