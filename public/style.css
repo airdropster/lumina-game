@@ -624,9 +624,7 @@ button {
   color: var(--text-accent);
 }
 
-/* ------------------------------------------------------------
-   6. CARD DESIGN
-   ------------------------------------------------------------ */
+/* -- 6. CARD DESIGN -- */
 .card {
   width: var(--card-w);
   height: var(--card-h);
@@ -638,170 +636,98 @@ button {
   font-size: 1.25rem;
   position: relative;
   cursor: pointer;
-  transition: all var(--t-fast);
+  transition: transform var(--t-fast), box-shadow var(--t-fast);
   transform-style: preserve-3d;
   user-select: none;
-  border: 2px solid;
+  border: 1px solid var(--card-border, var(--border-default));
+  background: var(--card-bg, var(--bg-surface-raised));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 20px var(--card-glow, transparent), 0 8px 16px rgba(0, 0, 0, 0.3);
+  color: #f8fafc;
 }
 
-.card:hover {
-  transform: translateY(-3px);
-  z-index: var(--z-cards);
+.player-grid .card:not(.face-down):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px var(--card-glow, transparent), 0 12px 20px rgba(0, 0, 0, 0.35);
 }
 
-/* Card in bot grids — smaller */
+/* Card in bot grids — smaller, reduced blur */
 .bot-grid .card {
   width: var(--card-bot-w);
   height: var(--card-bot-h);
   font-size: 0.9rem;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-.bot-grid .card:hover {
-  transform: translateY(-2px);
-}
-
-/* -- Color Variants -- */
+/* -- Glass Color Variants -- */
 .card.card-blue {
-  background: var(--card-blue-bg);
-  border-color: var(--card-blue-border);
-  color: var(--card-blue-border);
-  box-shadow: var(--card-blue-glow);
-}
-
-.card.card-blue:hover {
-  box-shadow: 0 0 14px #60a5fa, 0 0 28px rgba(96, 165, 250, 0.3);
+  --card-bg: rgba(96, 165, 250, 0.22);
+  --card-border: rgba(96, 165, 250, 0.5);
+  --card-glow: rgba(96, 165, 250, 0.2);
+  --card-bg-solid: rgba(96, 165, 250, 0.35);
 }
 
 .card.card-violet {
-  background: var(--card-violet-bg);
-  border-color: var(--card-violet-border);
-  color: var(--card-violet-border);
-  box-shadow: var(--card-violet-glow);
-}
-
-.card.card-violet:hover {
-  box-shadow: 0 0 14px #a78bfa, 0 0 28px rgba(167, 139, 250, 0.3);
+  --card-bg: rgba(167, 139, 250, 0.22);
+  --card-border: rgba(167, 139, 250, 0.5);
+  --card-glow: rgba(167, 139, 250, 0.2);
+  --card-bg-solid: rgba(167, 139, 250, 0.35);
 }
 
 .card.card-orange {
-  background: var(--card-orange-bg);
-  border-color: var(--card-orange-border);
-  color: var(--card-orange-border);
-  box-shadow: var(--card-orange-glow);
-}
-
-.card.card-orange:hover {
-  box-shadow: 0 0 14px #fb923c, 0 0 28px rgba(251, 146, 60, 0.3);
+  --card-bg: rgba(251, 146, 60, 0.22);
+  --card-border: rgba(251, 146, 60, 0.5);
+  --card-glow: rgba(251, 146, 60, 0.2);
+  --card-bg-solid: rgba(251, 146, 60, 0.35);
 }
 
 .card.card-green {
-  background: var(--card-green-bg);
-  border-color: var(--card-green-border);
-  color: var(--card-green-border);
-  box-shadow: var(--card-green-glow);
+  --card-bg: rgba(74, 222, 128, 0.22);
+  --card-border: rgba(74, 222, 128, 0.5);
+  --card-glow: rgba(74, 222, 128, 0.2);
+  --card-bg-solid: rgba(74, 222, 128, 0.35);
 }
 
-.card.card-green:hover {
-  box-shadow: 0 0 14px #4ade80, 0 0 28px rgba(74, 222, 128, 0.3);
-}
-
-/* Multicolor (-2 card) */
 .card.card-multi {
-  background: var(--card-multi-bg);
-  border-color: transparent;
-  color: #fff;
-  position: relative;
+  background: linear-gradient(135deg, rgba(96,165,250,0.15), rgba(167,139,250,0.15), rgba(251,146,60,0.15), rgba(74,222,128,0.15));
+  --card-border: rgba(148, 163, 184, 0.4);
+  --card-glow: rgba(148, 163, 184, 0.15);
+  border-color: var(--card-border);
 }
 
-.card.card-multi::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: calc(var(--card-radius) + 2px);
-  padding: 2px;
-  background: linear-gradient(
-    var(--rainbow-angle, 0deg),
-    #60a5fa, #a78bfa, #fb923c, #4ade80, #60a5fa
-  );
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: rainbow-rotate 3s linear infinite;
-}
-
-@property --rainbow-angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
-
-@keyframes rainbow-rotate {
-  to { --rainbow-angle: 360deg; }
-}
-
-/* Fallback rainbow for browsers without @property */
-@supports not (background: paint(something)) {
-  .card.card-multi::before {
-    animation: rainbow-rotate-fallback 3s linear infinite;
-  }
-
-  @keyframes rainbow-rotate-fallback {
-    0%   { background: linear-gradient(0deg,   #60a5fa, #a78bfa, #fb923c, #4ade80, #60a5fa); }
-    25%  { background: linear-gradient(90deg,  #60a5fa, #a78bfa, #fb923c, #4ade80, #60a5fa); }
-    50%  { background: linear-gradient(180deg, #60a5fa, #a78bfa, #fb923c, #4ade80, #60a5fa); }
-    75%  { background: linear-gradient(270deg, #60a5fa, #a78bfa, #fb923c, #4ade80, #60a5fa); }
-    100% { background: linear-gradient(360deg, #60a5fa, #a78bfa, #fb923c, #4ade80, #60a5fa); }
-  }
-}
-
-/* No-color / Neutral (15) */
 .card.card-neutral {
-  background: var(--card-neutral-bg);
-  border-color: var(--card-neutral-border);
-  color: var(--card-neutral-border);
-  box-shadow: var(--card-neutral-glow);
+  --card-bg: rgba(226, 232, 240, 0.15);
+  --card-border: rgba(226, 232, 240, 0.4);
+  --card-glow: rgba(226, 232, 240, 0.15);
+  --card-bg-solid: rgba(226, 232, 240, 0.3);
 }
 
-/* -- Face-down card -- */
+/* Face-down card */
 .card.face-down {
-  background:
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 4px,
-      rgba(51, 65, 85, 0.3) 4px,
-      rgba(51, 65, 85, 0.3) 5px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 4px,
-      rgba(51, 65, 85, 0.3) 4px,
-      rgba(51, 65, 85, 0.3) 5px
-    ),
-    var(--card-facedown-bg);
-  border-color: var(--card-facedown-border);
-  color: transparent;
+  --card-bg: rgba(51, 65, 85, 0.3);
+  --card-border: rgba(51, 65, 85, 0.5);
+  --card-glow: transparent;
+  color: var(--text-muted);
   cursor: pointer;
-  box-shadow: none;
 }
 
 .card.face-down:hover {
-  border-color: var(--text-muted);
-  box-shadow: 0 0 8px rgba(51, 65, 85, 0.3);
+  --card-border: var(--text-muted);
 }
 
-/* -- Prism visual upgrade (corner badge + glow, card color still visible) -- */
+/* backdrop-filter fallback */
+@supports not (backdrop-filter: blur(1px)) {
+  .card { background: var(--card-bg-solid, rgba(30, 41, 59, 0.85)); }
+}
+
+/* -- Prism — softened glow -- */
 .card.prismed {
   position: relative;
   overflow: visible;
   border: 2px solid var(--prism-cyan);
-  box-shadow:
-    0 0 12px rgba(34, 211, 238, 0.5),
-    0 0 24px rgba(34, 211, 238, 0.25),
-    inset 0 0 8px rgba(34, 211, 238, 0.2);
+  box-shadow: var(--prism-glow);
   animation: prism-glow 2.5s ease-in-out infinite;
 }
 
@@ -812,8 +738,7 @@ button {
   right: 3px;
   font-size: 0.65rem;
   font-weight: 700;
-  color: #22d3ee;
-  text-shadow: 0 0 6px rgba(34, 211, 238, 0.9), 0 0 12px rgba(34, 211, 238, 0.5);
+  color: var(--prism-cyan);
   animation: prism-pulse 2s ease-in-out infinite;
 }
 
@@ -824,8 +749,8 @@ button {
 }
 
 @keyframes prism-glow {
-  0%, 100% { box-shadow: 0 0 10px rgba(34, 211, 238, 0.4), inset 0 0 6px rgba(34, 211, 238, 0.15); }
-  50%      { box-shadow: 0 0 18px rgba(34, 211, 238, 0.6), inset 0 0 10px rgba(34, 211, 238, 0.25); }
+  0%, 100% { box-shadow: 0 0 6px rgba(34, 211, 238, 0.3); }
+  50%      { box-shadow: 0 0 12px rgba(34, 211, 238, 0.5); }
 }
 
 @keyframes prism-pulse {
@@ -833,12 +758,55 @@ button {
   50%      { opacity: 0.5; }
 }
 
-/* -- Action Guide Strip (shows step-by-step instructions below action buttons) -- */
+/* -- Immune — softened amber -- */
+.card.immune {
+  animation: immune-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes immune-glow {
+  0%, 100% { border-color: var(--immune-amber); box-shadow: 0 0 6px rgba(245, 158, 11, 0.3); }
+  50%      { border-color: #fbbf24; box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+}
+
+/* -- Selected card -- */
+.card.selected {
+  outline: 2px solid var(--prism-cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.3);
+}
+
+/* -- Attack target — subtle border pulse -- */
+.card.attack-target {
+  border-color: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+  cursor: pointer;
+  animation: pulse-attack 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-attack {
+  0%, 100% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.3); }
+  50%      { box-shadow: 0 0 14px rgba(239, 68, 68, 0.5); }
+}
+
+/* -- Empty grid slot -- */
+.card-slot {
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: var(--card-radius);
+  border: 1px dashed var(--border-default);
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.bot-grid .card-slot {
+  width: var(--card-bot-w);
+  height: var(--card-bot-h);
+}
+
+/* -- Action Guide -- */
 .action-guide {
   width: 100%;
   text-align: center;
   padding: 8px 16px;
-  font-family: var(--font-mono);
   font-size: 0.78rem;
   color: var(--text-secondary);
   background: var(--bg-surface-raised);
@@ -847,9 +815,7 @@ button {
   margin-top: 6px;
   line-height: 1.5;
 }
-.action-guide strong {
-  color: var(--text-primary);
-}
+.action-guide strong { color: var(--text-primary); }
 .action-guide .step {
   display: inline-block;
   background: rgba(255, 255, 255, 0.06);
@@ -874,59 +840,7 @@ button {
   opacity: 0.7;
   color: inherit;
 }
-.bot-grid .card-color-label {
-  font-size: 0.35rem;
-}
-
-/* -- Immune card (pulsing amber border) -- */
-.card.immune {
-  animation: immune-glow 1.5s ease-in-out infinite;
-}
-
-@keyframes immune-glow {
-  0%, 100% {
-    border-color: var(--immune-amber);
-    box-shadow: 0 0 8px var(--immune-amber);
-  }
-  50% {
-    border-color: #fbbf24;
-    box-shadow: var(--immune-glow);
-  }
-}
-
-/* -- Selected card highlight -- */
-.card.selected {
-  outline: 2px solid var(--prism-cyan);
-  outline-offset: 2px;
-  box-shadow: 0 0 12px rgba(34, 211, 238, 0.4);
-}
-
-/* -- Attack target highlight -- */
-.card.attack-target {
-  box-shadow: 0 0 12px 3px #ff3c4a, inset 0 0 8px rgba(255, 0, 60, 0.15);
-  border-color: #ff3c4a;
-  cursor: pointer;
-  animation: pulse-glow 1.2s ease-in-out infinite;
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 12px 3px #ff3c4a, inset 0 0 8px rgba(255, 0, 60, 0.15); }
-  50% { box-shadow: 0 0 20px 6px #ff3c4a, inset 0 0 12px rgba(255, 0, 60, 0.25); }
-}
-
-/* -- Empty grid slot -- */
-.card-slot {
-  width: var(--card-w);
-  height: var(--card-h);
-  border-radius: var(--card-radius);
-  border: 1px dashed var(--border-default);
-  background: rgba(15, 23, 42, 0.3);
-}
-
-.bot-grid .card-slot {
-  width: var(--card-bot-w);
-  height: var(--card-bot-h);
-}
+.bot-grid .card-color-label { font-size: 0.35rem; }
 
 /* ------------------------------------------------------------
    7. ANIMATIONS
