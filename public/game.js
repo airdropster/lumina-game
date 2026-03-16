@@ -100,6 +100,13 @@ export function createGame({ botCount, botDifficulties }) {
     cumulativeScores: new Array(totalPlayers).fill(0),
     actionLog: [],
 
+    // ── Peek Deck ────────────────────────────────────────────────
+
+    peekDeck() {
+      this._reshuffleDeck();
+      return this.deck[this.deck.length - 1];
+    },
+
     // ── Reveal Phase ──────────────────────────────────────────────
 
     revealCard(playerIndex, row, col) {

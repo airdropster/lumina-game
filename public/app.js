@@ -9,8 +9,11 @@ import {
   renderRoundEnd,
   renderGameEnd,
   renderHistory,
+  renderStatsScreen,
   showDeckDrawDialog,
   logAction,
+  logRichAction,
+  flashGridCell,
   highlightAttackTargets,
   clearAttackHighlights,
 } from './ui.js';
@@ -43,7 +46,7 @@ function showSetup() {
   constructSource = null;
   roundStats = [];
   isProcessingBot = false;
-  renderSetupScreen(document.body, onStartGame);
+  renderSetupScreen(document.body, onStartGame, showStatsScreen);
 }
 
 function onStartGame({ botCount, botDifficulties }) {
@@ -78,6 +81,7 @@ function renderBoard() {
     onDeckClick: handleDeckClick,
     onDiscardClick: handleDiscardClick,
     onActionClick: handleActionClick,
+    onStatsClick: showStatsScreen,
   });
 
   // Show phase-specific status in the log
@@ -273,8 +277,12 @@ function handleDeckClick() {
     return;
   }
 
+  // Peek at the top card to show in the dialog
+  const drawnCard = game.peekDeck();
+
   // Offer choice: place on grid or discard and reveal
   showDeckDrawDialog(
+    drawnCard,
     () => {
       constructSource = 'deck';
       logAction(document, 'Click a card in your grid to replace it with the drawn card.');
@@ -380,11 +388,42 @@ function scheduleBotTurn() {
   }, delay);
 }
 
+/** Build inline card badge HTML for the rich action log. */
+function _badge(value, color) {
+  const cls = color === 'multicolor' ? 'card-badge-multi'
+    : color === null ? 'card-badge-neutral'
+    : `card-badge-${color}`;
+  return `<span class="card-badge ${cls}">${value}</span>`;
+}
+
 function executeBotTurn() {
   const botIndex = game.currentPlayerIndex;
   const bot = game.players[botIndex];
 
   const action = chooseBotAction(game, botIndex);
+
+  // Capture card values BEFORE the action modifies the grid
+  let oldCard = null;
+  let attackerCard = null;
+  let defenderCard = null;
+  let secureCard = null;
+  let discardTop = null;
+
+  if (action.type === 'construct') {
+    if (action.source === 'discard') {
+      oldCard = { ...bot.grid[action.row][action.col] };
+      discardTop = game.discard.length > 0 ? { ...game.discard[game.discard.length - 1] } : null;
+    } else if (action.source === 'deck_discard') {
+      // No card to capture for deck_discard (drawn card goes to discard, a face-down is revealed)
+    } else {
+      oldCard = { ...bot.grid[action.row][action.col] };
+    }
+  } else if (action.type === 'attack') {
+    attackerCard = { ...bot.grid[action.attackerRow][action.attackerCol] };
+    defenderCard = { ...game.players[action.defenderIndex].grid[action.defenderRow][action.defenderCol] };
+  } else if (action.type === 'secure') {
+    secureCard = { ...bot.grid[action.row][action.col] };
+  }
 
   if (action.type === 'construct') {
     if (action.source === 'discard') {
@@ -403,6 +442,36 @@ function executeBotTurn() {
     );
   } else if (action.type === 'secure') {
     game.secure(botIndex, action.row, action.col);
+  }
+
+  // Rich action log with card badges and grid highlights
+  if (action.type === 'construct') {
+    if (action.source === 'discard' && discardTop) {
+      const newCard = bot.grid[action.row][action.col];
+      const badge = _badge(discardTop.value, discardTop.color);
+      const oldBadge = oldCard && oldCard.faceUp ? `, replaced ${_badge(oldCard.value, oldCard.color)}` : '';
+      logRichAction(document, { actor: bot.name, actionType: 'constructed', details: `${badge} at (${action.row + 1},${action.col + 1})${oldBadge}` });
+      flashGridCell(botIndex, action.row, action.col);
+    } else if (action.source === 'deck_discard') {
+      logRichAction(document, { actor: bot.name, actionType: 'drew and discarded', details: `revealed (${action.revealRow + 1},${action.revealCol + 1})` });
+      flashGridCell(botIndex, action.revealRow, action.revealCol);
+    } else {
+      const newCard = bot.grid[action.row][action.col];
+      const oldBadge = oldCard && oldCard.faceUp ? `, replaced ${_badge(oldCard.value, oldCard.color)}` : '';
+      logRichAction(document, { actor: bot.name, actionType: 'drew from deck', details: `placed at (${action.row + 1},${action.col + 1})${oldBadge}` });
+      flashGridCell(botIndex, action.row, action.col);
+    }
+  } else if (action.type === 'attack') {
+    const defName = game.players[action.defenderIndex].name;
+    const aBadge = _badge(attackerCard.value, attackerCard.color);
+    const dBadge = _badge(defenderCard.value, defenderCard.color);
+    logRichAction(document, { actor: bot.name, actionType: 'swapped', details: `${aBadge} \u2194 ${dBadge} from ${defName}, revealed (${action.revealRow + 1},${action.revealCol + 1})` });
+    flashGridCell(botIndex, action.revealRow, action.revealCol);
+    flashGridCell(action.defenderIndex, action.defenderRow, action.defenderCol);
+  } else if (action.type === 'secure') {
+    const sBadge = _badge(secureCard.value, secureCard.color);
+    logRichAction(document, { actor: bot.name, actionType: 'secured', details: `${sBadge} with prism` });
+    flashGridCell(botIndex, action.row, action.col);
   }
 
   // Check LUMINA
@@ -515,31 +584,42 @@ async function endGame() {
   });
 }
 
-// ── History Screen ─────────────────────────────────────────────────────
+// ── History / Stats Screen ─────────────────────────────────────────────
+
+async function fetchSessions() {
+  const history = await fetchHistory();
+  return (history || []).map((s) => ({
+    date: new Date(s.playedAt).toLocaleDateString(),
+    players: s.numPlayers,
+    rounds: s.numRounds,
+    winner: s.winner,
+    playerScore: s.playerFinalScore,
+    roundDetails: (s.rounds || [])
+      .filter((r) => r.playerName === 'Player')
+      .map((r) => ({
+        round: r.roundNumber,
+        playerScore: r.roundScore,
+        roundWinner: r.calledLumina ? 'LUMINA caller' : '-',
+      })),
+  }));
+}
 
 async function showHistoryScreen() {
   try {
-    const history = await fetchHistory();
-
-    // Transform server data to UI format
-    const sessions = (history || []).map((s) => ({
-      date: new Date(s.playedAt).toLocaleDateString(),
-      players: s.numPlayers,
-      rounds: s.numRounds,
-      winner: s.winner,
-      playerScore: s.playerFinalScore,
-      roundDetails: (s.rounds || [])
-        .filter((r) => r.playerName === 'Player')
-        .map((r) => ({
-          round: r.roundNumber,
-          playerScore: r.roundScore,
-          roundWinner: r.calledLumina ? 'LUMINA caller' : '-',
-        })),
-    }));
-
-    renderHistory(document.body, sessions);
+    const sessions = await fetchSessions();
+    renderStatsScreen(document.body, sessions, showSetup);
   } catch (e) {
     console.error('Failed to fetch history:', e);
-    renderHistory(document.body, []);
+    renderStatsScreen(document.body, [], showSetup);
+  }
+}
+
+async function showStatsScreen() {
+  try {
+    const sessions = await fetchSessions();
+    renderStatsScreen(document.body, sessions, showSetup);
+  } catch (e) {
+    console.error('Failed to fetch stats:', e);
+    renderStatsScreen(document.body, [], showSetup);
   }
 }

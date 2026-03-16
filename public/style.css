@@ -839,15 +839,32 @@ button {
   box-shadow: 0 0 8px rgba(51, 65, 85, 0.3);
 }
 
-/* -- Prism indicator (diamond badge, top-right) -- */
+/* -- Prism visual upgrade (rainbow border + shimmer + diamond badge) -- */
+.card.prismed {
+  position: relative;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.3), inset 0 0 8px rgba(34, 211, 238, 0.15);
+}
+
+.card.prismed::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: conic-gradient(from var(--prism-angle, 0deg), #22d3ee, #8b5cf6, #ec4899, #f97316, #22c55e, #22d3ee);
+  z-index: -1;
+  animation: prism-rotate 3s linear infinite;
+}
+
 .card.prismed::after {
   content: '\u25C6';
   position: absolute;
   top: 2px;
-  right: 3px;
+  right: 4px;
   font-size: 0.6rem;
-  color: var(--prism-cyan);
-  text-shadow: var(--prism-glow);
+  color: #22d3ee;
+  text-shadow: 0 0 4px rgba(34, 211, 238, 0.8);
   animation: prism-pulse 2s ease-in-out infinite;
 }
 
@@ -855,6 +872,19 @@ button {
   font-size: 0.45rem;
   top: 1px;
   right: 2px;
+}
+
+@keyframes prism-rotate {
+  to {
+    --prism-angle: 360deg;
+  }
+}
+
+/* Fallback rotation using filter for browsers without @property */
+@supports not (background: conic-gradient(from 0deg, red, blue)) {
+  .card.prismed::before {
+    background: linear-gradient(135deg, #22d3ee, #8b5cf6, #ec4899, #f97316, #22c55e, #22d3ee);
+  }
 }
 
 @keyframes prism-pulse {
@@ -1543,6 +1573,35 @@ button {
 .mb-4 { margin-bottom: var(--sp-4); }
 .mb-6 { margin-bottom: var(--sp-6); }
 
+/* -- 1A. Card Badges (inline in action log) -- */
+.card-badge { display: inline-block; min-width: 24px; height: 18px; border-radius: 4px; color: #fff; font-size: 0.7rem; font-weight: 700; text-align: center; line-height: 18px; padding: 0 4px; vertical-align: middle; margin: 0 2px; }
+.card-badge-blue { background: var(--card-blue-bg, #3b82f6); }
+.card-badge-violet { background: var(--card-violet-bg, #8b5cf6); }
+.card-badge-orange { background: var(--card-orange-bg, #f97316); }
+.card-badge-green { background: var(--card-green-bg, #22c55e); }
+.card-badge-multi { background: linear-gradient(135deg, #ec4899, #8b5cf6, #3b82f6); }
+.card-badge-neutral { background: #6b7280; }
+
+@keyframes action-highlight-fade {
+  0% { box-shadow: 0 0 15px rgba(250, 204, 21, 0.8); transform: scale(1.08); }
+  100% { box-shadow: none; transform: scale(1); }
+}
+.action-highlight { animation: action-highlight-fade 0.8s ease-out forwards; }
+
+/* -- 1B. Turn Banner -- */
+.turn-banner { width: 100%; text-align: center; padding: 10px 16px; font-family: var(--font-mono); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.05em; border-radius: 6px; margin-bottom: 8px; }
+.turn-banner--player { color: var(--prism-cyan, #22d3ee); border: 2px solid var(--prism-cyan, #22d3ee); background: rgba(34, 211, 238, 0.08); animation: pulse-border 1.5s ease-in-out infinite; }
+.turn-banner--bot { color: var(--text-secondary); border: 1px solid var(--border-default); background: var(--bg-surface-raised); }
+.turn-banner--reveal { color: #4ade80; border: 2px solid #4ade80; background: rgba(74, 222, 128, 0.08); }
+.turn-banner--final { color: #fbbf24; border: 2px solid #fbbf24; background: rgba(251, 191, 36, 0.08); animation: pulse-border-amber 1.5s ease-in-out infinite; }
+@keyframes pulse-border { 0%, 100% { border-color: rgba(34, 211, 238, 0.6); } 50% { border-color: rgba(34, 211, 238, 1); } }
+@keyframes pulse-border-amber { 0%, 100% { border-color: rgba(251, 191, 36, 0.6); } 50% { border-color: rgba(251, 191, 36, 1); } }
+
+/* -- 1C. Scoreboard -- */
+.scoreboard { display: flex; justify-content: center; gap: 12px; padding: 6px 16px; flex-wrap: wrap; margin-bottom: 8px; }
+.scoreboard-entry { padding: 4px 12px; border-radius: 20px; font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600; border: 1px solid var(--border-default); background: var(--bg-surface-raised); color: var(--text-secondary); }
+.scoreboard-entry--active { border-color: var(--prism-cyan, #22d3ee); color: var(--text-primary); background: rgba(34, 211, 238, 0.1); }
+
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -1728,4 +1787,139 @@ button {
     flex: 1;
     min-width: 80px;
   }
+}
+
+/* ------------------------------------------------------------
+   15. STATS DASHBOARD
+   ------------------------------------------------------------ */
+.stats-dashboard {
+  padding: 24px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--prism-cyan, #22d3ee);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 4px;
+}
+
+.btn-stats {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+
+.btn-stats:hover {
+  border-color: var(--prism-cyan, #22d3ee);
+  color: var(--text-primary);
+}
+
+/* ------------------------------------------------------------
+   16. CHEATSHEET OVERLAY
+   ------------------------------------------------------------ */
+.cheatsheet-overlay {
+  /* inherits from confirm-overlay */
+}
+
+.cheatsheet-dialog {
+  max-width: 500px;
+  padding: 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.cheatsheet-dialog h3 {
+  text-align: center;
+  font-size: 1.1rem;
+  margin-bottom: 16px;
+  color: var(--prism-cyan, #22d3ee);
+}
+
+.cheatsheet-section {
+  margin-bottom: 16px;
+}
+
+.cheatsheet-section h4 {
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.cheatsheet-section p,
+.cheatsheet-section li {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.btn-help {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-help:hover {
+  border-color: var(--prism-cyan, #22d3ee);
+  color: var(--text-primary);
+}
+
+.cheatsheet-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.cheatsheet-close:hover {
+  color: var(--text-primary);
 }

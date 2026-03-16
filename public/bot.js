@@ -3,7 +3,9 @@
 import { calcRoundScore } from './scoring.js';
 import { COLORS } from './cards.js';
 
-// ── Helpers ─────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════
+// ── Helpers ──────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════
 
 /**
  * Get all face-down card positions for a player.
@@ -153,7 +155,6 @@ function getValidAttackTargets(game, playerIndex) {
   for (let di = 0; di < game.players.length; di++) {
     if (di === playerIndex) continue;
     const defender = game.players[di];
-    // Check if defender is fully revealed (during final turns, can't attack them)
     if (game.phase === 'final_turns' && game.isLumina(di)) continue;
 
     for (let r = 0; r < 3; r++) {
@@ -188,7 +189,50 @@ function averageVisibleScore(game) {
   return count > 0 ? total / count : 0;
 }
 
+/**
+ * Count how many face-up cards in a row are in ascending order from left.
+ * Returns count of sequential ascending cards.
+ */
+function rowAscendingCount(grid, row) {
+  const cards = grid[row];
+  const faceUpEntries = [];
+  for (let c = 0; c < 4; c++) {
+    if (cards[c].faceUp) {
+      faceUpEntries.push({ col: c, value: cards[c].value });
+    }
+  }
+  if (faceUpEntries.length <= 1) return faceUpEntries.length;
+
+  let ascending = 1;
+  for (let i = 1; i < faceUpEntries.length; i++) {
+    if (faceUpEntries[i].value > faceUpEntries[i - 1].value) {
+      ascending++;
+    } else {
+      break;
+    }
+  }
+  return ascending;
+}
+
+/**
+ * Find the player with the highest cumulative score (excluding self).
+ */
+function findLeadingOpponent(game, playerIndex) {
+  let maxScore = -Infinity;
+  let leader = -1;
+  for (let i = 0; i < game.players.length; i++) {
+    if (i === playerIndex) continue;
+    if (game.cumulativeScores[i] > maxScore) {
+      maxScore = game.cumulativeScores[i];
+      leader = i;
+    }
+  }
+  return leader;
+}
+
+// ══════════════════════════════════════════════════════════════════════
 // ── chooseBotReveal ─────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════
 
 /**
  * Choose 2 cards for a bot to reveal during the reveal phase.
@@ -197,15 +241,74 @@ function averageVisibleScore(game) {
  * @returns {[[number, number], [number, number]]} Two [row, col] positions
  */
 export function chooseBotReveal(game, playerIndex) {
-  const grid = game.players[playerIndex].grid;
+  const player = game.players[playerIndex];
+  const difficulty = player.difficulty || 'easy';
+  const grid = player.grid;
   const faceDown = getFaceDownPositions(grid);
 
-  // Shuffle face-down positions and pick 2
-  const shuffled = [...faceDown].sort(() => Math.random() - 0.5);
-  return [shuffled[0], shuffled[1]];
+  if (difficulty === 'easy') {
+    // Easy: Random 2 positions
+    const shuffled = [...faceDown].sort(() => Math.random() - 0.5);
+    return [shuffled[0], shuffled[1]];
+  }
+
+  if (difficulty === 'medium') {
+    // Medium: Prefer corner positions — they participate in both a row and column
+    const corners = [[0, 0], [0, 3], [2, 0], [2, 3]];
+    const availableCorners = corners.filter(([r, c]) => !grid[r][c].faceUp);
+    if (availableCorners.length >= 2) {
+      const shuffled = [...availableCorners].sort(() => Math.random() - 0.5);
+      return [shuffled[0], shuffled[1]];
+    }
+    // Fall back to random if not enough corners
+    const shuffled = [...faceDown].sort(() => Math.random() - 0.5);
+    return [shuffled[0], shuffled[1]];
+  }
+
+  // Hard: Pick pair with highest information value
+  // Corners = 3, edges = 2, center = 1
+  const infoValue = (r, c) => {
+    const isCorner = (r === 0 || r === 2) && (c === 0 || c === 3);
+    const isEdge = (r === 0 || r === 2 || c === 0 || c === 3);
+    if (isCorner) return 3;
+    if (isEdge) return 2;
+    return 1;
+  };
+
+  let bestPair = null;
+  let bestScore = -Infinity;
+
+  for (let i = 0; i < faceDown.length; i++) {
+    for (let j = i + 1; j < faceDown.length; j++) {
+      const [r1, c1] = faceDown[i];
+      const [r2, c2] = faceDown[j];
+      let score = infoValue(r1, c1) + infoValue(r2, c2);
+
+      // Tiebreak: prefer positions in columns with face-up cards of the same color
+      // Check column color density as a bonus
+      for (const [r, c] of [faceDown[i], faceDown[j]]) {
+        for (let row = 0; row < 3; row++) {
+          if (row === r) continue;
+          const other = grid[row][c];
+          if (other.faceUp && other.color && other.color !== 'multicolor' && other.color !== null) {
+            score += 0.1; // small bonus for color information
+          }
+        }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestPair = [faceDown[i], faceDown[j]];
+      }
+    }
+  }
+
+  return bestPair || [faceDown[0], faceDown[1]];
 }
 
+// ══════════════════════════════════════════════════════════════════════
 // ── chooseBotAction ─────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════
 
 /**
  * Choose the best action for a bot based on its difficulty.
@@ -229,7 +332,9 @@ export function chooseBotAction(game, playerIndex) {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════
 // ── Easy Bot ────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════
 
 /**
  * Easy bot: 70% construct, 20% secure, 10% attack.
@@ -272,68 +377,522 @@ function chooseEasyAction(game, playerIndex) {
   return buildConstructAction(game, playerIndex, 'easy');
 }
 
+// ══════════════════════════════════════════════════════════════════════
 // ── Medium Bot ──────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════
 
 /**
- * Medium bot:
- * - Prefers high-value cards from discard (>=8) to replace lowest visible cards
- * - Checks for column bonus completion (2/3 same color -> secure)
- * - 15% chance to attack if big gain visible (value delta >= 5)
- * - Otherwise constructs from deck, replacing lowest visible or face-down cards
- * - Pursues LUMINA when visible score above average
+ * Medium bot — Heuristic-based decision making:
+ * - Discard evaluation: take from discard if value >= 7 AND it improves a visible position
+ * - Column awareness: prefer placements where card color matches existing face-up cards
+ * - Row awareness: when 3/4 ascending, prioritize completing the sequence
+ * - Opponent tracking: attack the player with highest cumulative score
+ * - Secure timing: only secure cards >= 7 in completed structures
+ * - LUMINA awareness: when 2 face-down remaining, boost reveal actions
+ * - Attack frequency: 25% chance when delta >= 4
  */
 function chooseMediumAction(game, playerIndex) {
   const available = game.getAvailableActions(playerIndex);
   const player = game.players[playerIndex];
   const grid = player.grid;
   const discard = topDiscard(game);
+  const faceDown = getFaceDownPositions(grid);
 
-  // 1. Check discard for high-value card (>=8)
-  if (discard && discard.value >= 8) {
-    const lowestPos = findLowestVisible(grid);
-    if (lowestPos) {
-      const lowestCard = grid[lowestPos[0]][lowestPos[1]];
-      if (discard.value > lowestCard.value) {
-        return {
-          type: 'construct',
-          source: 'discard',
-          row: lowestPos[0],
-          col: lowestPos[1],
-        };
-      }
+  // ── LUMINA awareness: when 2 face-down remaining, boost construct/deck_discard to reveal ──
+  if (faceDown.length <= 2 && faceDown.length > 0) {
+    // Prioritize actions that reveal face-down cards
+    // If discard is good, place it on a face-down position
+    if (discard && discard.value >= 7 && faceDown.length > 0) {
+      const pos = pickRandom(faceDown);
+      return { type: 'construct', source: 'discard', row: pos[0], col: pos[1] };
     }
-    // Also consider placing on face-down cards
-    const faceDown = getFaceDownPositions(grid);
+    // Otherwise construct from deck onto a face-down, or deck_discard to reveal
     if (faceDown.length > 0) {
       const pos = pickRandom(faceDown);
-      return {
-        type: 'construct',
-        source: 'discard',
-        row: pos[0],
-        col: pos[1],
-      };
+      if (Math.random() < 0.5) {
+        return { type: 'construct', source: 'deck', row: pos[0], col: pos[1] };
+      }
+      return { type: 'construct', source: 'deck_discard', revealRow: pos[0], revealCol: pos[1] };
     }
   }
 
-  // 2. Check for column bonus completion opportunity -> secure
+  // ── 1. Discard evaluation: take from discard if value >= 7 AND improves a visible position ──
+  if (discard && discard.value >= 7) {
+    let bestPos = null;
+    let bestImprovement = 0;
+
+    // Check all visible unprismed positions for improvement
+    const visiblePositions = getVisibleUnprismedPositions(grid);
+    for (const [r, c] of visiblePositions) {
+      const oldCard = grid[r][c];
+      if (discard.value > oldCard.value) {
+        let improvement = discard.value - oldCard.value;
+
+        // Column color awareness bonus: if discard color matches column cards
+        if (discard.color && discard.color !== null) {
+          const matchCount = columnColorMatchCount(grid, c, discard.color);
+          if (matchCount === 2) improvement += 5; // would complete column
+          else if (matchCount === 1) improvement += 2;
+        }
+
+        if (improvement > bestImprovement) {
+          bestImprovement = improvement;
+          bestPos = [r, c];
+        }
+      }
+    }
+
+    // Also consider placing on face-down positions
+    for (const [r, c] of faceDown) {
+      let improvement = discard.value - 6; // assume average hidden value ~6
+      if (discard.color && discard.color !== null) {
+        const matchCount = columnColorMatchCount(grid, c, discard.color);
+        if (matchCount === 2) improvement += 5;
+        else if (matchCount === 1) improvement += 2;
+      }
+      if (improvement > bestImprovement) {
+        bestImprovement = improvement;
+        bestPos = [r, c];
+      }
+    }
+
+    if (bestPos && bestImprovement > 0) {
+      return { type: 'construct', source: 'discard', row: bestPos[0], col: bestPos[1] };
+    }
+  }
+
+  // ── 2. Row awareness: if 3/4 ascending in a row, try to complete it ──
+  for (let row = 0; row < 3; row++) {
+    const cards = grid[row];
+    const faceUpInRow = [];
+    let gapCol = -1;
+
+    for (let c = 0; c < 4; c++) {
+      if (cards[c].faceUp && !cards[c].hasPrism) {
+        faceUpInRow.push({ col: c, value: cards[c].value });
+      } else if (!cards[c].faceUp) {
+        gapCol = c;
+      }
+    }
+
+    // If exactly 3 face-up cards and 1 face-down, check if 3 are ascending
+    if (faceUpInRow.length === 3 && gapCol >= 0) {
+      faceUpInRow.sort((a, b) => a.col - b.col);
+      let ascending = true;
+      for (let i = 1; i < faceUpInRow.length; i++) {
+        if (faceUpInRow[i].value <= faceUpInRow[i - 1].value) {
+          ascending = false;
+          break;
+        }
+      }
+      if (ascending) {
+        // Try to complete by constructing at the gap
+        return { type: 'construct', source: 'deck', row: row, col: gapCol };
+      }
+    }
+  }
+
+  // ── 3. Secure timing: only secure cards >= 7 in completed structures ──
   if (available.includes('secure') && player.prismsRemaining > 0) {
-    for (let col = 0; col < 4; col++) {
-      // Count same-color face-up cards in column
-      const cards = [grid[0][col], grid[1][col], grid[2][col]];
-      const faceUpCards = cards.filter((c) => c.faceUp);
-      if (faceUpCards.length >= 2) {
-        const concreteColors = faceUpCards
-          .filter((c) => c.color !== 'multicolor' && c.color !== null)
-          .map((c) => c.color);
-        if (
-          concreteColors.length > 0 &&
-          concreteColors.every((c) => c === concreteColors[0])
-        ) {
-          // Find a high-value unprismed card in this column to secure
-          for (let r = 0; r < 3; r++) {
-            const card = grid[r][col];
-            if (card.faceUp && !card.hasPrism && card.value >= 5) {
-              return { type: 'secure', row: r, col };
+    let bestSecure = null;
+    let bestSecureValue = 0;
+
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 4; c++) {
+        const card = grid[r][c];
+        if (!card.faceUp || card.hasPrism) continue;
+        if (card.value < 7) continue;
+        if (!isInValidStructure(grid, r, c)) continue;
+
+        if (card.value > bestSecureValue) {
+          bestSecureValue = card.value;
+          bestSecure = { type: 'secure', row: r, col: c };
+        }
+      }
+    }
+
+    if (bestSecure) return bestSecure;
+  }
+
+  // ── 4. Attack: 25% chance when delta >= 4, prefer leading opponent ──
+  if (available.includes('attack') && Math.random() < 0.25) {
+    const action = buildMediumAttackAction(game, playerIndex);
+    if (action) return action;
+  }
+
+  // ── 5. Column awareness: construct from deck, placing in color-matching columns ──
+  return buildMediumConstructAction(game, playerIndex);
+}
+
+/**
+ * Medium bot attack: prefer targeting the player with the highest cumulative score,
+ * targeting their high-value cards. Delta threshold: >= 4.
+ */
+function buildMediumAttackAction(game, playerIndex) {
+  const player = game.players[playerIndex];
+  const grid = player.grid;
+  const attackerPositions = getVisibleUnprismedPositions(grid);
+  const costPositions = getFaceDownPositions(grid);
+  const targets = getValidAttackTargets(game, playerIndex);
+
+  if (attackerPositions.length === 0 || costPositions.length === 0 || targets.length === 0) {
+    return null;
+  }
+
+  const leadingOpponent = findLeadingOpponent(game, playerIndex);
+
+  // Build valid pairs with delta >= 4
+  const validPairs = [];
+  for (const [ar, ac] of attackerPositions) {
+    const attackerCard = grid[ar][ac];
+    for (const target of targets) {
+      const delta = target.card.value - attackerCard.value;
+      if (delta >= 4) {
+        // Bonus for targeting leading opponent
+        const leaderBonus = target.defenderIndex === leadingOpponent ? 3 : 0;
+        // Bonus for targeting high-value cards
+        const valueBonus = target.card.value;
+        validPairs.push({
+          ar, ac, target, delta,
+          score: delta + leaderBonus + valueBonus,
+        });
+      }
+    }
+  }
+
+  if (validPairs.length === 0) return null;
+
+  // Pick the best scoring pair
+  validPairs.sort((a, b) => b.score - a.score);
+  const pick = validPairs[0];
+  const [costR, costC] = pickRandom(costPositions);
+
+  return {
+    type: 'attack',
+    attackerRow: pick.ar,
+    attackerCol: pick.ac,
+    defenderIndex: pick.target.defenderIndex,
+    defenderRow: pick.target.row,
+    defenderCol: pick.target.col,
+    revealRow: costR,
+    revealCol: costC,
+  };
+}
+
+/**
+ * Medium bot construct: prefer placing cards in columns where the color matches.
+ */
+function buildMediumConstructAction(game, playerIndex) {
+  const player = game.players[playerIndex];
+  const grid = player.grid;
+  const discard = topDiscard(game);
+  const faceDown = getFaceDownPositions(grid);
+
+  // Find best target position with column color awareness
+  const lowestPos = findLowestVisible(grid);
+
+  let targetRow, targetCol;
+
+  if (lowestPos) {
+    [targetRow, targetCol] = lowestPos;
+  } else if (faceDown.length > 0) {
+    [targetRow, targetCol] = pickRandom(faceDown);
+  } else {
+    const unprismed = getVisibleUnprismedPositions(grid);
+    if (unprismed.length > 0) {
+      [targetRow, targetCol] = pickRandom(unprismed);
+    } else {
+      targetRow = 0;
+      targetCol = 0;
+    }
+  }
+
+  return { type: 'construct', source: 'deck', row: targetRow, col: targetCol };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ── Hard Bot — Monte Carlo + Utility Engine ─────────────────────────
+// ══════════════════════════════════════════════════════════════════════
+
+/**
+ * Hard bot: Generate ALL valid actions, run Monte Carlo simulation for each,
+ * pick the one with the highest average evaluation.
+ */
+function chooseHardAction(game, playerIndex) {
+  const candidates = generateAllCandidateActions(game, playerIndex);
+
+  if (candidates.length === 0) {
+    return buildConstructAction(game, playerIndex, 'hard');
+  }
+
+  // Run Monte Carlo for each candidate
+  let bestAction = candidates[0];
+  let bestScore = -Infinity;
+
+  for (const candidate of candidates) {
+    const score = simulateGame(game, playerIndex, candidate, 3, 50);
+    if (score > bestScore) {
+      bestScore = score;
+      bestAction = candidate;
+    }
+  }
+
+  return bestAction;
+}
+
+/**
+ * Generate all valid actions for the hard bot to evaluate.
+ */
+function generateAllCandidateActions(game, playerIndex) {
+  const player = game.players[playerIndex];
+  const grid = player.grid;
+  const available = game.getAvailableActions(playerIndex);
+  const discard = topDiscard(game);
+  const faceDown = getFaceDownPositions(grid);
+  const visibleUnprismed = getVisibleUnprismedPositions(grid);
+  const candidates = [];
+
+  // ── Construct from deck: at each valid position ──
+  for (const [r, c] of visibleUnprismed) {
+    candidates.push({ type: 'construct', source: 'deck', row: r, col: c });
+  }
+  for (const [r, c] of faceDown) {
+    candidates.push({ type: 'construct', source: 'deck', row: r, col: c });
+  }
+
+  // ── Construct from discard: at each valid position ──
+  if (discard) {
+    for (const [r, c] of visibleUnprismed) {
+      candidates.push({ type: 'construct', source: 'discard', row: r, col: c });
+    }
+    for (const [r, c] of faceDown) {
+      candidates.push({ type: 'construct', source: 'discard', row: r, col: c });
+    }
+  }
+
+  // ── Construct deck_discard: reveal each face-down ──
+  for (const [r, c] of faceDown) {
+    candidates.push({ type: 'construct', source: 'deck_discard', revealRow: r, revealCol: c });
+  }
+
+  // ── Attack: all valid attacker-target-cost combinations ──
+  if (available.includes('attack') && faceDown.length > 0 && visibleUnprismed.length > 0) {
+    const targets = getValidAttackTargets(game, playerIndex);
+    // Limit combinatorial explosion: pick best cost position (first facedown)
+    const costPos = faceDown[0];
+
+    for (const target of targets) {
+      for (const [ar, ac] of visibleUnprismed) {
+        const attackerCard = grid[ar][ac];
+        if (target.card.value <= attackerCard.value) continue; // skip bad swaps
+
+        candidates.push({
+          type: 'attack',
+          attackerRow: ar,
+          attackerCol: ac,
+          defenderIndex: target.defenderIndex,
+          defenderRow: target.row,
+          defenderCol: target.col,
+          revealRow: costPos[0],
+          revealCol: costPos[1],
+        });
+      }
+    }
+  }
+
+  // ── Secure: prefer highest-value cards in valid structures ──
+  if (available.includes('secure') && player.prismsRemaining > 0) {
+    // Collect all securable positions in valid structures
+    const secureCandidates = [];
+    for (const [r, c] of visibleUnprismed) {
+      const card = grid[r][c];
+      if (card.value >= 5 && isInValidStructure(grid, r, c)) {
+        secureCandidates.push({ r, c, value: card.value });
+      }
+    }
+
+    if (secureCandidates.length > 0) {
+      // Sort by value descending — only send top candidates to MC (avoid noise)
+      secureCandidates.sort((a, b) => b.value - a.value);
+      const maxValue = secureCandidates[0].value;
+      // Only include candidates within 2 points of the best
+      for (const sc of secureCandidates) {
+        if (sc.value >= maxValue - 2) {
+          candidates.push({ type: 'secure', row: sc.r, col: sc.c });
+        }
+      }
+    } else {
+      // Fallback: consider high-value cards even outside structures
+      for (const [r, c] of visibleUnprismed) {
+        if (grid[r][c].value >= 8) {
+          candidates.push({ type: 'secure', row: r, col: c });
+        }
+      }
+    }
+  }
+
+  return candidates;
+}
+
+// ── Monte Carlo Simulation Engine ───────────────────────────────────
+
+/**
+ * Clone the game state into a minimal plain object for simulation.
+ * No class instances, no DOM, just arrays and primitives.
+ */
+function cloneGameForSim(game) {
+  const players = game.players.map((p) => ({
+    name: p.name,
+    isBot: p.isBot,
+    difficulty: p.difficulty,
+    prismsRemaining: p.prismsRemaining,
+    grid: p.grid.map((row) =>
+      row.map((card) => ({
+        value: card.value,
+        color: card.color,
+        faceUp: card.faceUp,
+        hasPrism: card.hasPrism,
+        immune: card.immune,
+      }))
+    ),
+  }));
+
+  return {
+    players,
+    deckLength: game.deck.length,
+    discard: game.discard.map((c) => ({ value: c.value, color: c.color })),
+    cumulativeScores: [...game.cumulativeScores],
+    phase: game.phase,
+    currentPlayerIndex: game.currentPlayerIndex,
+  };
+}
+
+/**
+ * Apply an action to a cloned game state (in-place mutation).
+ * Simplified — no full game method calls, just direct array manipulation.
+ */
+function applyActionToClone(clone, playerIndex, action) {
+  const player = clone.players[playerIndex];
+  const grid = player.grid;
+
+  if (action.type === 'construct') {
+    if (action.source === 'discard' && clone.discard.length > 0) {
+      const drawn = clone.discard.pop();
+      const target = grid[action.row][action.col];
+      // Discard old card
+      clone.discard.push({ value: target.value, color: target.color });
+      // Place new card
+      grid[action.row][action.col] = {
+        value: drawn.value,
+        color: drawn.color,
+        faceUp: true,
+        hasPrism: false,
+        immune: false,
+      };
+    } else if (action.source === 'deck_discard') {
+      // Draw random card, discard it, reveal face-down
+      const randomCard = generateRandomCard();
+      clone.discard.push(randomCard);
+      clone.deckLength = Math.max(0, clone.deckLength - 1);
+      if (action.revealRow !== undefined) {
+        grid[action.revealRow][action.revealCol].faceUp = true;
+      }
+    } else {
+      // Construct from deck
+      const randomCard = generateRandomCard();
+      const target = grid[action.row][action.col];
+      clone.discard.push({ value: target.value, color: target.color });
+      grid[action.row][action.col] = {
+        value: randomCard.value,
+        color: randomCard.color,
+        faceUp: true,
+        hasPrism: false,
+        immune: false,
+      };
+      clone.deckLength = Math.max(0, clone.deckLength - 1);
+    }
+  } else if (action.type === 'attack') {
+    const defender = clone.players[action.defenderIndex];
+    const attackerCard = grid[action.attackerRow][action.attackerCol];
+    const defenderCard = defender.grid[action.defenderRow][action.defenderCol];
+
+    // Reveal cost card
+    if (action.revealRow !== undefined) {
+      grid[action.revealRow][action.revealCol].faceUp = true;
+    }
+
+    // Swap
+    grid[action.attackerRow][action.attackerCol] = {
+      value: defenderCard.value,
+      color: defenderCard.color,
+      faceUp: true,
+      hasPrism: false,
+      immune: false,
+    };
+    defender.grid[action.defenderRow][action.defenderCol] = {
+      value: attackerCard.value,
+      color: attackerCard.color,
+      faceUp: true,
+      hasPrism: false,
+      immune: true,
+    };
+  } else if (action.type === 'secure') {
+    const card = grid[action.row][action.col];
+    card.hasPrism = true;
+    player.prismsRemaining--;
+  }
+}
+
+/**
+ * Generate a random card for simulation (approximating deck composition).
+ */
+function generateRandomCard() {
+  const roll = Math.random();
+  if (roll < 0.857) {
+    // 96/112 = ~85.7% chance of vector card
+    const value = Math.floor(Math.random() * 12) + 1;
+    const color = COLORS[Math.floor(Math.random() * 4)];
+    return { value, color };
+  } else if (roll < 0.928) {
+    // 8/112 = ~7.1% multicolor
+    return { value: -2, color: 'multicolor' };
+  } else {
+    // 8/112 = ~7.1% colorless
+    return { value: 15, color: null };
+  }
+}
+
+/**
+ * Generate a random valid action for a simulated player.
+ */
+function generateRandomAction(clone, playerIndex) {
+  const player = clone.players[playerIndex];
+  const grid = player.grid;
+  const faceDown = getFaceDownPositions(grid);
+  const visibleUnprismed = getVisibleUnprismedPositions(grid);
+
+  // 70% construct, 15% attack, 15% secure
+  const roll = Math.random();
+
+  if (roll < 0.15 && faceDown.length > 0 && visibleUnprismed.length > 0) {
+    // Try attack
+    for (let di = 0; di < clone.players.length; di++) {
+      if (di === playerIndex) continue;
+      const defGrid = clone.players[di].grid;
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 4; c++) {
+          const card = defGrid[r][c];
+          if (card.faceUp && !card.hasPrism && !card.immune) {
+            const [ar, ac] = pickRandom(visibleUnprismed);
+            if (card.value > grid[ar][ac].value) {
+              const [costR, costC] = pickRandom(faceDown);
+              return {
+                type: 'attack',
+                attackerRow: ar, attackerCol: ac,
+                defenderIndex: di,
+                defenderRow: r, defenderCol: c,
+                revealRow: costR, revealCol: costC,
+              };
             }
           }
         }
@@ -341,309 +900,234 @@ function chooseMediumAction(game, playerIndex) {
     }
   }
 
-  // 3. 15% chance to attack if big gain visible (delta >= 5)
-  if (available.includes('attack') && Math.random() < 0.15) {
-    const action = buildAttackAction(game, playerIndex, 'medium');
-    if (action) return action;
+  if (roll < 0.30 && visibleUnprismed.length > 0 && player.prismsRemaining > 0) {
+    // Try secure
+    const [r, c] = pickRandom(visibleUnprismed);
+    if (grid[r][c].value >= 5) {
+      return { type: 'secure', row: r, col: c };
+    }
   }
 
-  // 4. Construct from deck, replacing lowest visible or face-down
-  return buildConstructAction(game, playerIndex, 'medium');
+  // Default: construct
+  const allPositions = [...visibleUnprismed, ...faceDown];
+  if (allPositions.length === 0) {
+    // Fallback
+    return { type: 'construct', source: 'deck', row: 0, col: 0 };
+  }
+  const [tr, tc] = pickRandom(allPositions);
+
+  // Sometimes use discard
+  if (clone.discard.length > 0 && Math.random() < 0.3) {
+    return { type: 'construct', source: 'discard', row: tr, col: tc };
+  }
+
+  // Sometimes use deck_discard for face-down
+  if (faceDown.length > 0 && Math.random() < 0.2) {
+    const [fr, fc] = pickRandom(faceDown);
+    return { type: 'construct', source: 'deck_discard', revealRow: fr, revealCol: fc };
+  }
+
+  return { type: 'construct', source: 'deck', row: tr, col: tc };
 }
 
-// ── Hard Bot ────────────────────────────────────────────────────────
-
 /**
- * Hard bot: Evaluates ALL valid actions via utility scoring.
- *
- * utility(action) =
- *   card_value_delta x 1.0
- *   + structure_bonus_potential x 1.5
- *   + opponent_disruption x 0.8
- *   - risk_of_revealing_bad_card x 1.2
+ * Evaluate the board state for a given player.
+ * Returns a numeric score representing board quality.
  */
-function chooseHardAction(game, playerIndex) {
-  const grid = game.players[playerIndex].grid;
-  const faceDown = getFaceDownPositions(grid);
+function evaluateBoard(clone, playerIndex) {
+  const player = clone.players[playerIndex];
+  const grid = player.grid;
+  let score = 0;
 
-  // ── LUMINA urgency ──
-  // When close to revealing all cards, boost actions that reveal face-down cards.
-  // LUMINA is auto-detected by the game engine when all cards are face-up,
-  // so the bot just needs to prioritize revealing its remaining face-down cards.
-  let luminaUrgency = 0;
-  if (faceDown.length === 1) luminaUrgency = 3.0;
-  else if (faceDown.length === 2) luminaUrgency = 1.5;
+  // Sum of face-up card values
+  let faceDownCount = 0;
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 4; c++) {
+      const card = grid[r][c];
+      if (card.faceUp) {
+        score += card.value;
+      } else {
+        faceDownCount++;
+      }
+    }
+  }
 
-  // ── Opponent LUMINA threat ──
-  // Check if any opponent is close to calling LUMINA (1-2 face-down)
-  const threateningOpponents = new Set();
-  for (let i = 0; i < game.players.length; i++) {
+  // -3 per face-down card (unknown risk)
+  score -= faceDownCount * 3;
+
+  // +10 per completed column bonus
+  for (let col = 0; col < 4; col++) {
+    if (isValidColumnClone(grid, col)) {
+      score += 10;
+    } else {
+      // +5 per card that's 1 away from completing a column structure
+      const colCards = [grid[0][col], grid[1][col], grid[2][col]];
+      const faceUpCards = colCards.filter((c) => c.faceUp);
+      if (faceUpCards.length === 2) {
+        const faceDownInCol = colCards.filter((c) => !c.faceUp);
+        if (faceDownInCol.length === 1) {
+          // Check if the 2 face-up cards match color
+          const concreteColors = faceUpCards
+            .filter((c) => c.color !== 'multicolor' && c.color !== null)
+            .map((c) => c.color);
+          if (concreteColors.length <= 1 || concreteColors.every((c) => c === concreteColors[0])) {
+            if (!faceUpCards.some((c) => c.color === null)) {
+              score += 5;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // +10 per completed row bonus
+  for (let row = 0; row < 3; row++) {
+    if (isValidRowClone(grid, row)) {
+      score += 10;
+    } else {
+      // +5 if 1 away from completing a row
+      const cards = grid[row];
+      const faceUpCount = cards.filter((c) => c.faceUp).length;
+      if (faceUpCount === 3) {
+        // Check if the 3 face-up cards are ascending in their positions
+        const faceUpEntries = [];
+        for (let c = 0; c < 4; c++) {
+          if (cards[c].faceUp) {
+            faceUpEntries.push({ col: c, value: cards[c].value });
+          }
+        }
+        faceUpEntries.sort((a, b) => a.col - b.col);
+        let ascending = true;
+        for (let i = 1; i < faceUpEntries.length; i++) {
+          if (faceUpEntries[i].value <= faceUpEntries[i - 1].value) {
+            ascending = false;
+            break;
+          }
+        }
+        if (ascending) score += 5;
+      }
+    }
+  }
+
+  // +10 if any prismed card in valid structure (prism bonus)
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 4; c++) {
+      const card = grid[r][c];
+      if (card.hasPrism && (isValidColumnClone(grid, c) || isValidRowClone(grid, r))) {
+        score += 10;
+        break; // only once
+      }
+    }
+  }
+
+  // -0.5 * (max opponent visible score - my visible score) if behind
+  let myVisibleScore = 0;
+  let maxOppVisibleScore = -Infinity;
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 4; c++) {
+      if (grid[r][c].faceUp) myVisibleScore += grid[r][c].value;
+    }
+  }
+  for (let i = 0; i < clone.players.length; i++) {
     if (i === playerIndex) continue;
-    const oppFaceDown = getFaceDownPositions(game.players[i].grid);
-    if (oppFaceDown.length <= 2) threateningOpponents.add(i);
+    let oppScore = 0;
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 4; c++) {
+        if (clone.players[i].grid[r][c].faceUp) {
+          oppScore += clone.players[i].grid[r][c].value;
+        }
+      }
+    }
+    if (oppScore > maxOppVisibleScore) maxOppVisibleScore = oppScore;
+  }
+  if (maxOppVisibleScore > myVisibleScore) {
+    score -= 0.5 * (maxOppVisibleScore - myVisibleScore);
   }
 
-  const candidates = [];
+  // LUMINA proximity bonus
+  if (faceDownCount === 1) score += 15;
+  else if (faceDownCount === 2) score += 8;
 
-  // Generate all possible construct actions
-  candidates.push(...generateConstructCandidates(game, playerIndex, luminaUrgency));
-
-  // Generate all possible attack actions
-  candidates.push(...generateAttackCandidates(game, playerIndex, luminaUrgency, threateningOpponents));
-
-  // Generate all possible secure actions
-  candidates.push(...generateSecureCandidates(game, playerIndex));
-
-  if (candidates.length === 0) {
-    // Absolute fallback: construct from deck at random position
-    return buildConstructAction(game, playerIndex, 'hard');
-  }
-
-  // Pick highest utility
-  candidates.sort((a, b) => b.utility - a.utility);
-  return candidates[0].action;
-}
-
-function generateConstructCandidates(game, playerIndex, luminaUrgency = 0) {
-  const player = game.players[playerIndex];
-  const grid = player.grid;
-  const candidates = [];
-  const discard = topDiscard(game);
-
-  // Construct from discard: evaluate placing discard card at each position
-  if (discard) {
-    const positions = getVisibleUnprismedPositions(grid);
-    const faceDown = getFaceDownPositions(grid);
-
-    for (const [r, c] of positions) {
-      const oldCard = grid[r][c];
-      const valueDelta = discard.value - oldCard.value;
-      const structureBonus = evalStructureBonusPotential(grid, r, c, discard);
-      const risk = 0; // no risk, we know the card
-      const utility =
-        valueDelta * 1.0 + structureBonus * 1.5 - risk * 1.2;
-
-      candidates.push({
-        utility,
-        action: { type: 'construct', source: 'discard', row: r, col: c },
-      });
-    }
-
-    for (const [r, c] of faceDown) {
-      // Replacing face-down: assume average hidden value of ~6
-      const valueDelta = discard.value - 6;
-      const structureBonus = evalStructureBonusPotential(grid, r, c, discard);
-      const utility = valueDelta * 1.0 + structureBonus * 1.5 + luminaUrgency;
-
-      candidates.push({
-        utility,
-        action: { type: 'construct', source: 'discard', row: r, col: c },
-      });
-    }
-  }
-
-  // Construct from deck: replace lowest visible or face-down
-  {
-    const positions = getVisibleUnprismedPositions(grid);
-    const faceDown = getFaceDownPositions(grid);
-
-    for (const [r, c] of positions) {
-      const oldCard = grid[r][c];
-      // Expected deck card value is ~6 (average of deck)
-      const valueDelta = 6 - oldCard.value;
-      const risk = 3; // uncertainty of random draw
-      const utility = valueDelta * 1.0 - risk * 1.2;
-
-      candidates.push({
-        utility,
-        action: { type: 'construct', source: 'deck', row: r, col: c },
-      });
-    }
-
-    for (const [r, c] of faceDown) {
-      // Replacing unknown with unknown: reveals a card + LUMINA urgency
-      const utility = 0.5 + luminaUrgency;
-      candidates.push({
-        utility,
-        action: { type: 'construct', source: 'deck', row: r, col: c },
-      });
-    }
-  }
-
-  // Construct deck_discard: draw from deck but discard it, reveal a face-down
-  {
-    const faceDown = getFaceDownPositions(grid);
-    for (const [r, c] of faceDown) {
-      // Value of revealing + LUMINA urgency
-      const utility = 0.2 + luminaUrgency;
-      candidates.push({
-        utility,
-        action: {
-          type: 'construct',
-          source: 'deck_discard',
-          revealRow: r,
-          revealCol: c,
-        },
-      });
-    }
-  }
-
-  return candidates;
-}
-
-function generateAttackCandidates(game, playerIndex, luminaUrgency = 0, threateningOpponents = new Set()) {
-  const available = game.getAvailableActions(playerIndex);
-  if (!available.includes('attack')) return [];
-
-  const player = game.players[playerIndex];
-  const grid = player.grid;
-  const candidates = [];
-
-  const attackerPositions = getVisibleUnprismedPositions(grid);
-  const costPositions = getFaceDownPositions(grid);
-  const targets = getValidAttackTargets(game, playerIndex);
-
-  if (costPositions.length === 0 || attackerPositions.length === 0) return [];
-
-  for (const target of targets) {
-    for (const [ar, ac] of attackerPositions) {
-      const attackerCard = grid[ar][ac];
-      const defenderCard = target.card;
-
-      // Value delta: how much better is the defender's card?
-      const valueDelta = defenderCard.value - attackerCard.value;
-      if (valueDelta <= 0) continue; // never attack for a worse card
-
-      // Disruption: bonus if card is in opponent's valid structure
-      const defenderGrid = game.players[target.defenderIndex].grid;
-      const disruption = isInValidStructure(defenderGrid, target.row, target.col)
-        ? 5
-        : 0;
-
-      // Risk: revealing a face-down card (assume average ~6, risk is variance)
-      const risk = 3;
-
-      // Pick a random cost position
-      const [costR, costC] = pickRandom(costPositions);
-
-      // LUMINA bonuses: urgency for revealing a face-down + threat disruption
-      const luminaRevealBonus = luminaUrgency * 0.5;
-      const threatBonus = threateningOpponents.has(target.defenderIndex) ? 2.0 : 0;
-
-      const utility =
-        valueDelta * 1.0 + disruption * 0.8 - risk * 1.2 + luminaRevealBonus + threatBonus;
-
-      candidates.push({
-        utility,
-        action: {
-          type: 'attack',
-          attackerRow: ar,
-          attackerCol: ac,
-          defenderIndex: target.defenderIndex,
-          defenderRow: target.row,
-          defenderCol: target.col,
-          revealRow: costR,
-          revealCol: costC,
-        },
-      });
-    }
-  }
-
-  return candidates;
-}
-
-function generateSecureCandidates(game, playerIndex) {
-  const available = game.getAvailableActions(playerIndex);
-  if (!available.includes('secure')) return [];
-
-  const player = game.players[playerIndex];
-  const grid = player.grid;
-  const candidates = [];
-
-  if (player.prismsRemaining <= 0) return [];
-
-  const positions = getVisibleUnprismedPositions(grid);
-
-  for (const [r, c] of positions) {
-    const card = grid[r][c];
-
-    // Only consider securing cards worth >= 5 AND in valid structure
-    const inStructure = isInValidStructure(grid, r, c);
-    if (card.value < 5 || !inStructure) {
-      // Low utility, but include it
-      const utility = (card.value * 0.1) + (inStructure ? 1 : -2);
-      candidates.push({
-        utility,
-        action: { type: 'secure', row: r, col: c },
-      });
-      continue;
-    }
-
-    // High value card in valid structure: high utility
-    const utility = card.value * 0.5 + 5;
-    candidates.push({
-      utility,
-      action: { type: 'secure', row: r, col: c },
-    });
-  }
-
-  return candidates;
+  return score;
 }
 
 /**
- * Evaluate how much a card placement contributes to structure bonuses.
- * Checks column color matching and row ascending potential.
+ * Check valid column for clone grids (no game object needed).
  */
-function evalStructureBonusPotential(grid, row, col, newCard) {
-  let bonus = 0;
-
-  // Column color bonus: how many of the other 2 cards in this column match?
-  if (newCard.color && newCard.color !== null) {
-    let matchCount = 0;
-    for (let r = 0; r < 3; r++) {
-      if (r === row) continue;
-      const other = grid[r][col];
-      if (!other.faceUp) continue;
-      if (
-        other.color === newCard.color ||
-        other.color === 'multicolor' ||
-        newCard.color === 'multicolor'
-      ) {
-        matchCount++;
-      }
-    }
-    // 2 matches = completing a column bonus (very valuable)
-    // 1 match = contributing toward a column bonus
-    if (matchCount === 2) bonus += 5;
-    else if (matchCount === 1) bonus += 2;
-  }
-
-  // Row ascending potential: would this help form an ascending row?
-  const rowCards = [...grid[row]];
-  // Simulate placing the new card
-  const simRow = rowCards.map((c, i) =>
-    i === col
-      ? { ...newCard, faceUp: true }
-      : c
-  );
-  const faceUpValues = simRow
-    .filter((c) => c.faceUp)
-    .map((c) => c.value);
-  if (faceUpValues.length === 4) {
-    let ascending = true;
-    for (let i = 1; i < 4; i++) {
-      if (simRow[i].value <= simRow[i - 1].value) {
-        ascending = false;
-        break;
-      }
-    }
-    if (ascending) bonus += 5;
-  }
-
-  return bonus;
+function isValidColumnClone(grid, col) {
+  const cards = [grid[0][col], grid[1][col], grid[2][col]];
+  if (cards.some((c) => !c.faceUp)) return false;
+  if (cards.some((c) => c.color === null)) return false;
+  const concreteColors = cards
+    .filter((c) => c.color !== 'multicolor')
+    .map((c) => c.color);
+  if (concreteColors.length === 0) return true;
+  return concreteColors.every((c) => c === concreteColors[0]);
 }
 
-// ── Action Builders ─────────────────────────────────────────────────
+/**
+ * Check valid row for clone grids (no game object needed).
+ */
+function isValidRowClone(grid, row) {
+  const cards = grid[row];
+  if (cards.some((c) => !c.faceUp)) return false;
+  for (let i = 1; i < 4; i++) {
+    if (cards[i].value <= cards[i - 1].value) return false;
+  }
+  return true;
+}
+
+/**
+ * Run Monte Carlo simulation for a candidate action.
+ * Deep clones the game state, applies the action, then simulates
+ * `iterations` random continuations of `depth` turns each.
+ * Returns average board evaluation score.
+ *
+ * @param {object} game - Real game state
+ * @param {number} playerIndex - The hard bot's index
+ * @param {object} action - The candidate action to evaluate
+ * @param {number} depth - Number of turns to simulate (default 3)
+ * @param {number} iterations - Number of random simulations (default 50)
+ * @returns {number} Average evaluation score
+ */
+function simulateGame(game, playerIndex, action, depth = 3, iterations = 50) {
+  let totalScore = 0;
+  const numPlayers = game.players.length;
+
+  for (let iter = 0; iter < iterations; iter++) {
+    // Clone and apply the candidate action
+    const clone = cloneGameForSim(game);
+    applyActionToClone(clone, playerIndex, action);
+
+    // Simulate `depth` rounds of play for all players
+    let currentPlayer = (playerIndex + 1) % numPlayers;
+    for (let d = 0; d < depth * numPlayers; d++) {
+      const randomAction = generateRandomAction(clone, currentPlayer);
+      applyActionToClone(clone, currentPlayer, randomAction);
+      currentPlayer = (currentPlayer + 1) % numPlayers;
+    }
+
+    // Evaluate the resulting board for our player
+    totalScore += evaluateBoard(clone, playerIndex);
+
+    // Also factor in attack targeting bonuses from the original action
+    if (action.type === 'attack') {
+      const defenderGrid = game.players[action.defenderIndex].grid;
+      if (isInValidStructure(defenderGrid, action.defenderRow, action.defenderCol)) {
+        totalScore += 3; // bonus for breaking opponent structure
+      }
+      if (action.defenderIndex === findLeadingOpponent(game, playerIndex)) {
+        totalScore += 2; // bonus for targeting leader
+      }
+    }
+  }
+
+  return totalScore / iterations;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ── Action Builders (shared / fallback) ─────────────────────────────
+// ══════════════════════════════════════════════════════════════════════
 
 function buildConstructAction(game, playerIndex, difficulty) {
   const player = game.players[playerIndex];
@@ -743,24 +1227,6 @@ function buildAttackAction(game, playerIndex, difficulty) {
   }
 
   if (validPairs.length === 0) return null;
-
-  // For medium: only attack if delta >= 5
-  if (difficulty === 'medium') {
-    const bigGains = validPairs.filter((p) => p.delta >= 5);
-    if (bigGains.length === 0) return null;
-    const pick = pickRandom(bigGains);
-    const [costR, costC] = pickRandom(costPositions);
-    return {
-      type: 'attack',
-      attackerRow: pick.ar,
-      attackerCol: pick.ac,
-      defenderIndex: pick.target.defenderIndex,
-      defenderRow: pick.target.row,
-      defenderCol: pick.target.col,
-      revealRow: costR,
-      revealCol: costC,
-    };
-  }
 
   // Easy / default: pick random valid pair
   const pick = pickRandom(validPairs);

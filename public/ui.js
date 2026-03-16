@@ -1,5 +1,6 @@
 /** @module ui – DOM rendering layer for LUMINA */
 
+import { PHASE } from './game.js';
 import { calcRoundScore } from './scoring.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -113,7 +114,7 @@ export function renderCard(card, size = 'normal') {
  * @param {HTMLElement} container
  * @param {function({ botCount: number, botDifficulties: string[] }): void} onStart
  */
-export function renderSetupScreen(container, onStart) {
+export function renderSetupScreen(container, onStart, onViewStats) {
   const screen = showScreen('setup-screen');
   screen.innerHTML = '';
 
@@ -216,6 +217,16 @@ export function renderSetupScreen(container, onStart) {
   });
   card.appendChild(startBtn);
 
+  // View Stats button
+  if (onViewStats) {
+    const viewStatsBtn = el('button', 'btn-stats');
+    viewStatsBtn.textContent = 'VIEW STATS';
+    viewStatsBtn.style.display = 'block';
+    viewStatsBtn.style.margin = 'var(--sp-3) auto 0';
+    viewStatsBtn.addEventListener('click', () => onViewStats());
+    card.appendChild(viewStatsBtn);
+  }
+
   screen.appendChild(card);
 }
 
@@ -246,7 +257,57 @@ export function renderGameBoard(container, game, callbacks) {
   scoreDisplay.innerHTML = `Score: <span class="score-value">${game.cumulativeScores[0]}</span>`;
   header.appendChild(scoreDisplay);
 
+  // Header buttons (Stats + Help)
+  const headerBtns = el('span');
+  headerBtns.style.display = 'flex';
+  headerBtns.style.gap = 'var(--sp-2)';
+
+  const statsBtn = el('button', 'btn-stats');
+  statsBtn.textContent = 'STATS';
+  statsBtn.setAttribute('aria-label', 'View stats');
+  statsBtn.addEventListener('click', () => callbacks.onStatsClick());
+  headerBtns.appendChild(statsBtn);
+
+  const helpBtn = el('button', 'btn-help');
+  helpBtn.textContent = '?';
+  helpBtn.setAttribute('aria-label', 'Game rules');
+  helpBtn.addEventListener('click', () => showCheatsheet());
+  headerBtns.appendChild(helpBtn);
+
+  header.appendChild(headerBtns);
+
   screen.appendChild(header);
+
+  // ── Turn Banner ──
+  const turnBanner = el('div', 'turn-banner');
+  if (game.phase === PHASE.REVEAL) {
+    const remaining = game.players[0].revealsLeft;
+    turnBanner.classList.add('turn-banner--reveal');
+    turnBanner.textContent = `REVEAL PHASE \u2014 Click ${remaining} cards to flip`;
+  } else if (game.phase === PHASE.FINAL_TURNS) {
+    const callerName = game.luminaCaller !== null ? game.players[game.luminaCaller].name : 'Unknown';
+    turnBanner.classList.add('turn-banner--final');
+    turnBanner.textContent = `FINAL TURNS \u2014 LUMINA called by ${callerName}!`;
+  } else if (game.currentPlayerIndex === 0) {
+    turnBanner.classList.add('turn-banner--player');
+    turnBanner.textContent = 'YOUR TURN \u2014 Choose an action';
+  } else {
+    const botName = game.players[game.currentPlayerIndex].name;
+    turnBanner.classList.add('turn-banner--bot');
+    turnBanner.textContent = `${botName} is thinking...`;
+  }
+  screen.appendChild(turnBanner);
+
+  // ── Scoreboard ──
+  const scoreboard = el('div', 'scoreboard');
+  for (let i = 0; i < game.players.length; i++) {
+    const classes = ['scoreboard-entry'];
+    if (i === game.currentPlayerIndex) classes.push('scoreboard-entry--active');
+    const entry = el('div', classes);
+    entry.textContent = `${game.players[i].name}: ${game.cumulativeScores[i]}`;
+    scoreboard.appendChild(entry);
+  }
+  screen.appendChild(scoreboard);
 
   // ── Bot Zone ──
   const botZone = el('div', 'bot-zone');
@@ -793,6 +854,263 @@ export function renderHistory(container, sessions) {
   screen.appendChild(backBtn);
 }
 
+// ── renderStatsScreen ─────────────────────────────────────────────────
+
+/**
+ * Render a full stats dashboard.
+ * @param {HTMLElement} container
+ * @param {Array<{ date: string, players: string|string[], rounds: number, winner: string, playerScore: number, roundDetails?: Array }>} sessions
+ * @param {function(): void} onBack
+ */
+export function renderStatsScreen(container, sessions, onBack) {
+  const screen = showScreen('history-screen');
+  screen.innerHTML = '';
+
+  const dashboard = el('div', 'stats-dashboard');
+
+  const heading = el('h2');
+  heading.textContent = 'Stats Dashboard';
+  heading.style.textAlign = 'center';
+  heading.style.marginBottom = 'var(--sp-6)';
+  dashboard.appendChild(heading);
+
+  // Calculate stats
+  const total = sessions.length;
+  const wins = sessions.filter((s) => s.winner && s.winner.includes('Player')).length;
+  const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+
+  // Current win streak (most recent consecutive wins)
+  let streak = 0;
+  for (let i = 0; i < sessions.length; i++) {
+    if (sessions[i].winner && sessions[i].winner.includes('Player')) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+
+  const totalScore = sessions.reduce((sum, s) => sum + (s.playerScore || 0), 0);
+  const avgScore = total > 0 ? Math.round(totalScore / total) : 0;
+
+  // Stat cards row
+  const statCards = el('div', 'stat-cards');
+
+  const statData = [
+    { value: String(total), label: 'Total Games' },
+    { value: winRate + '%', label: 'Win Rate' },
+    { value: String(streak), label: 'Win Streak' },
+    { value: String(avgScore), label: 'Avg Score/Game' },
+  ];
+
+  for (const sd of statData) {
+    const card = el('div', 'stat-card');
+    const valEl = el('div', 'stat-value');
+    valEl.textContent = sd.value;
+    card.appendChild(valEl);
+    const labelEl = el('div', 'stat-label');
+    labelEl.textContent = sd.label;
+    card.appendChild(labelEl);
+    statCards.appendChild(card);
+  }
+  dashboard.appendChild(statCards);
+
+  // Per-difficulty breakdown
+  const diffSection = el('div', 'stat-cards');
+  const difficulties = ['easy', 'medium', 'hard'];
+  for (const diff of difficulties) {
+    const diffSessions = sessions.filter((s) => {
+      const p = Array.isArray(s.players) ? s.players.join(' ') : String(s.players);
+      return p.toLowerCase().includes(diff);
+    });
+    const diffTotal = diffSessions.length;
+    const diffWins = diffSessions.filter((s) => s.winner && s.winner.includes('Player')).length;
+    const diffRate = diffTotal > 0 ? Math.round((diffWins / diffTotal) * 100) + '%' : 'N/A';
+
+    const card = el('div', 'stat-card');
+    const valEl = el('div', 'stat-value');
+    valEl.textContent = diffRate;
+    card.appendChild(valEl);
+    const labelEl = el('div', 'stat-label');
+    labelEl.textContent = 'vs ' + diff.charAt(0).toUpperCase() + diff.slice(1);
+    card.appendChild(labelEl);
+    diffSection.appendChild(card);
+  }
+  dashboard.appendChild(diffSection);
+
+  // Recent games table
+  if (sessions.length > 0) {
+    const tableHeading = el('h3');
+    tableHeading.textContent = 'Recent Games';
+    tableHeading.style.marginTop = 'var(--sp-6)';
+    tableHeading.style.marginBottom = 'var(--sp-3)';
+    dashboard.appendChild(tableHeading);
+
+    const table = el('table', 'history-table');
+    const thead = el('thead');
+    const headerRow = el('tr');
+    ['Date', 'Players', 'Rounds', 'Winner', 'Your Score'].forEach((h) => {
+      const th = el('th');
+      th.textContent = h;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = el('tbody');
+    for (const session of sessions) {
+      const row = el('tr');
+
+      const dateCell = el('td');
+      dateCell.textContent = session.date;
+      row.appendChild(dateCell);
+
+      const playersCell = el('td');
+      playersCell.textContent = Array.isArray(session.players) ? session.players.join(', ') : String(session.players);
+      row.appendChild(playersCell);
+
+      const roundsCell = el('td');
+      roundsCell.textContent = String(session.rounds);
+      row.appendChild(roundsCell);
+
+      const winnerCell = el('td', 'winner-cell');
+      winnerCell.textContent = session.winner;
+      row.appendChild(winnerCell);
+
+      const scoreCell = el('td');
+      scoreCell.textContent = String(session.playerScore);
+      row.appendChild(scoreCell);
+
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    dashboard.appendChild(table);
+  } else {
+    const empty = el('p');
+    empty.textContent = 'No games played yet.';
+    empty.style.textAlign = 'center';
+    empty.style.color = 'var(--text-secondary)';
+    dashboard.appendChild(empty);
+  }
+
+  // Back button
+  const backBtn = el('button', 'btn-back');
+  backBtn.textContent = 'Back';
+  backBtn.style.marginTop = 'var(--sp-6)';
+  backBtn.addEventListener('click', () => {
+    if (onBack) {
+      onBack();
+    } else {
+      hideAllScreens();
+    }
+  });
+  dashboard.appendChild(backBtn);
+
+  screen.appendChild(dashboard);
+}
+
+// ── showCheatsheet ────────────────────────────────────────────────────
+
+/**
+ * Show a modal overlay with game rules / quick reference.
+ */
+export function showCheatsheet() {
+  const overlay = el('div', ['confirm-overlay', 'cheatsheet-overlay']);
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+
+  const dialog = el('div', 'cheatsheet-dialog');
+  dialog.style.position = 'relative';
+
+  // Close button
+  const closeBtn = el('button', 'cheatsheet-close');
+  closeBtn.textContent = '\u00D7';
+  closeBtn.setAttribute('aria-label', 'Close cheatsheet');
+  closeBtn.addEventListener('click', () => {
+    overlay.remove();
+    document.removeEventListener('keydown', escHandler);
+  });
+  dialog.appendChild(closeBtn);
+
+  // Title
+  const title = el('h3');
+  title.textContent = 'LUMINA \u2014 Quick Reference';
+  dialog.appendChild(title);
+
+  // Sections
+  const sections = [
+    {
+      heading: 'ACTIONS (pick one per turn)',
+      items: [
+        'CONSTRUCT \u2014 Draw from Deck or Discard, place on your grid (replaces existing card). OR draw from Deck and discard it, then reveal a face-down card.',
+        'ATTACK \u2014 Swap your face-up card with an opponent\'s. Cost: reveal a face-down card.',
+        'SECURE \u2014 Place a prism on a face-up card to protect it (3 prisms per round).',
+      ],
+    },
+    {
+      heading: 'SCORING',
+      items: [
+        'Base Score \u2014 Sum of all face-up card values (-5 per face-down card)',
+        'Column Bonus \u2014 +10 for each column of 3 same-color cards (multicolor is wildcard)',
+        'Row Bonus \u2014 +10 for each row of 4 strictly ascending values',
+        'Prism Bonus \u2014 +10 if ANY prismed card is in a valid structure',
+      ],
+    },
+    {
+      heading: 'LUMINA',
+      items: [
+        'When ALL your cards are face-up \u2192 LUMINA is called.',
+        'Each other player gets one final turn.',
+        'Caller gets +10 if strictly highest score, -10 otherwise.',
+      ],
+    },
+    {
+      heading: 'WIN CONDITION',
+      items: [
+        'First player to reach 200 cumulative points wins!',
+      ],
+    },
+    {
+      heading: 'CARDS',
+      items: [
+        '96 Vector cards: values 1-12, 4 colors (blue, violet, orange, green), 2 copies each',
+        '8 Multicolor cards: value -2, acts as color wildcard',
+        '8 Colorless cards: value 15, no color (can\'t contribute to column bonus)',
+      ],
+    },
+  ];
+
+  for (const section of sections) {
+    const sectionDiv = el('div', 'cheatsheet-section');
+
+    const h4 = el('h4');
+    h4.textContent = section.heading;
+    sectionDiv.appendChild(h4);
+
+    const ul = el('ul');
+    ul.style.paddingLeft = '1.2em';
+    ul.style.margin = '0';
+    for (const item of section.items) {
+      const li = el('li');
+      li.textContent = item;
+      ul.appendChild(li);
+    }
+    sectionDiv.appendChild(ul);
+    dialog.appendChild(sectionDiv);
+  }
+
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  // Close on Escape
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      overlay.remove();
+      document.removeEventListener('keydown', escHandler);
+    }
+  };
+  document.addEventListener('keydown', escHandler);
+}
+
 // ── showConfirmDialog ──────────────────────────────────────────────────
 
 /**
@@ -856,10 +1174,11 @@ export function showConfirmDialog(message, onConfirm, onCancel) {
 
 /**
  * Show a modal dialog for choosing what to do with a drawn deck card.
+ * @param {{ value: number, color: string|null }} card – the drawn card to display
  * @param {function(): void} onPlace – called when player chooses to place on grid
  * @param {function(): void} onDiscard – called when player chooses to discard and reveal
  */
-export function showDeckDrawDialog(onPlace, onDiscard) {
+export function showDeckDrawDialog(card, onPlace, onDiscard) {
   const overlay = el('div', 'confirm-overlay');
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
@@ -870,8 +1189,17 @@ export function showDeckDrawDialog(onPlace, onDiscard) {
   heading.textContent = 'Draw from Deck';
   dialog.appendChild(heading);
 
+  // Show the drawn card
+  const cardWrapper = el('div');
+  cardWrapper.style.display = 'flex';
+  cardWrapper.style.justifyContent = 'center';
+  cardWrapper.style.marginBottom = 'var(--sp-4)';
+  const cardEl = renderCard({ value: card.value, color: card.color, faceUp: true, hasPrism: false, immune: false }, 'normal');
+  cardWrapper.appendChild(cardEl);
+  dialog.appendChild(cardWrapper);
+
   const msg = el('p');
-  msg.textContent = 'Choose what to do with the drawn card';
+  msg.textContent = 'You drew this card. What do you want to do?';
   dialog.appendChild(msg);
 
   const actions = el('div', 'dialog-actions');
@@ -974,4 +1302,75 @@ export function logAction(container, message) {
   }
 
   logDiv.scrollTop = 0;
+}
+
+// ── logRichAction ──────────────────────────────────────────────────────
+
+/**
+ * Map card color to badge CSS class suffix.
+ * @param {string|null} color
+ * @returns {string}
+ */
+function badgeClass(color) {
+  if (color === 'multicolor') return 'card-badge-multi';
+  if (color === null) return 'card-badge-neutral';
+  return `card-badge-${color}`;
+}
+
+/**
+ * Build an inline card badge HTML string.
+ * @param {number} value
+ * @param {string|null} color
+ * @returns {string}
+ */
+function cardBadgeHTML(value, color) {
+  return `<span class="card-badge ${badgeClass(color)}">${value}</span>`;
+}
+
+/**
+ * Prepend a rich HTML log entry with inline card badges.
+ * @param {HTMLElement|Document} container
+ * @param {{ actor: string, actionType: string, details: string }} opts
+ */
+export function logRichAction(container, { actor, actionType, details }) {
+  const logDiv = container.querySelector ? container.querySelector('.action-log') : document.querySelector('.action-log');
+  if (!logDiv) return;
+
+  const entry = el('div', 'log-entry');
+  entry.innerHTML = `<span class="log-actor">${actor}</span> <span class="log-action">${actionType}</span> ${details}`;
+
+  const title = logDiv.querySelector('.log-title');
+  if (title && title.nextSibling) {
+    logDiv.insertBefore(entry, title.nextSibling);
+  } else {
+    logDiv.appendChild(entry);
+  }
+
+  logDiv.scrollTop = 0;
+}
+
+// ── flashGridCell ──────────────────────────────────────────────────────
+
+/**
+ * Add a brief highlight animation to a card element in the DOM.
+ * @param {number} playerIndex – 0 = player grid, 1+ = bot grid
+ * @param {number} row
+ * @param {number} col
+ */
+export function flashGridCell(playerIndex, row, col) {
+  let cardEl;
+  if (playerIndex === 0) {
+    const cells = document.querySelectorAll('.player-grid .card');
+    cardEl = cells[row * 4 + col];
+  } else {
+    const botTabs = document.querySelectorAll('.bot-tab');
+    const tab = botTabs[playerIndex - 1];
+    if (!tab) return;
+    const cells = tab.querySelectorAll('.bot-grid .card');
+    cardEl = cells[row * 4 + col];
+  }
+  if (!cardEl) return;
+
+  cardEl.classList.add('action-highlight');
+  setTimeout(() => cardEl.classList.remove('action-highlight'), 800);
 }
