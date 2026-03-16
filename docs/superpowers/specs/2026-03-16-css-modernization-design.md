@@ -45,7 +45,7 @@ Full CSS reset replacing the retro arcade theme with a modern shadcn-inspired da
 | Violet | `#a78bfa` | `rgba(167, 139, 250, 0.22)` | `rgba(167, 139, 250, 0.5)` | `rgba(167, 139, 250, 0.2)` |
 | Orange | `#fb923c` | `rgba(251, 146, 60, 0.22)` | `rgba(251, 146, 60, 0.5)` | `rgba(251, 146, 60, 0.2)` |
 | Green | `#4ade80` | `rgba(74, 222, 128, 0.22)` | `rgba(74, 222, 128, 0.5)` | `rgba(74, 222, 128, 0.2)` |
-| Multicolor | gradient | `linear-gradient(135deg, rgba(..., 0.15) x4)` | `rgba(148, 163, 184, 0.4)` | `rgba(148, 163, 184, 0.15)` |
+| Multicolor | gradient | `linear-gradient(135deg, rgba(96,165,250,0.15), rgba(167,139,250,0.15), rgba(251,146,60,0.15), rgba(74,222,128,0.15))` | `rgba(148, 163, 184, 0.4)` | `rgba(148, 163, 184, 0.15)` |
 | Neutral (15) | `#e2e8f0` | `rgba(226, 232, 240, 0.15)` | `rgba(226, 232, 240, 0.4)` | `rgba(226, 232, 240, 0.15)` |
 | Face-down | — | `rgba(51, 65, 85, 0.3)` | `rgba(51, 65, 85, 0.5)` | none |
 
@@ -73,6 +73,17 @@ Full CSS reset replacing the retro arcade theme with a modern shadcn-inspired da
 | `--font-sans` | `'Inter', system-ui, -apple-system, sans-serif` |
 
 **Remove:** `--font-mono` variable. Replace all `font-family` references with `var(--font-sans)`.
+
+**Keep as aliases** (for backward compatibility with inline JS styles in `ui.js`):
+
+| Old Token | Points to |
+|-----------|-----------|
+| `--card-blue-border` | `#60a5fa` |
+| `--card-violet-border` | `#a78bfa` |
+| `--card-orange-border` | `#fb923c` |
+| `--card-green-border` | `#4ade80` |
+
+These are referenced in `ui.js` inline styles and must remain in `:root`.
 
 ### Spacing, card dimensions, transitions, z-index
 
@@ -163,6 +174,30 @@ Keep amber shield but use `--immune-glow` (softened).
 
 - Value: `font-size: 18px`, `font-weight: 700`, `color: #f8fafc`
 - Color dot: `8px` circle in card's hue color, below value
+
+### Color variant class example
+
+```css
+.card-blue {
+  --card-bg: rgba(96, 165, 250, 0.22);
+  --card-border: rgba(96, 165, 250, 0.5);
+  --card-glow: rgba(96, 165, 250, 0.2);
+}
+```
+
+Same pattern for `.card-violet`, `.card-orange`, `.card-green`, `.card-multi`, `.card-neutral`.
+
+### `backdrop-filter` fallback
+
+```css
+@supports not (backdrop-filter: blur(1px)) {
+  .card {
+    background: var(--card-bg-solid, rgba(30, 41, 59, 0.85));
+  }
+}
+```
+
+Each color variant also sets a `--card-bg-solid` with higher opacity (e.g., `rgba(96, 165, 250, 0.35)`) for non-blur-capable browsers. Bot-zone cards use `blur(8px)` instead of `blur(16px)` to reduce compositing cost (72 cards on screen simultaneously).
 
 ---
 
@@ -334,6 +369,69 @@ No box-shadows on panels. Shadows are reserved for glass cards only.
 - Flat table rows
 - Clean typography
 
+### LUMINA flash — modernized
+
+Replace the neon text-shadow effect with a clean, modern full-screen overlay:
+
+```css
+.lumina-flash {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-flash);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 23, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: luminaFlash 1.5s ease forwards;
+}
+
+.lumina-flash::before {
+  content: 'LUMINA';
+  font-family: var(--font-sans);
+  font-size: 4rem;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: 0.2em;
+}
+
+@keyframes luminaFlash {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+```
+
+No text-shadow, no neon glow. Clean white text on frosted dark overlay, fades in and out.
+
+---
+
+## F2. Animation Disposition
+
+| Animation | Disposition | Notes |
+|-----------|------------|-------|
+| `cardFlip` | KEEP | Core gameplay — card reveal |
+| `cardSwap` | KEEP | Core gameplay — attack swap |
+| `cardDeal` | KEEP | Round start deal |
+| `prismDrop` | KEEP | Prism placement |
+| `prism-glow` | KEEP (modify) | Soften glow values to match `--prism-glow` |
+| `prism-pulse` | KEEP (modify) | Soften to subtle pulse |
+| `immune-glow` | KEEP (modify) | Soften glow values to match `--immune-glow` |
+| `luminaFlash` | KEEP (rewrite) | See LUMINA flash section above |
+| `fadeIn` | KEEP | Screen transitions |
+| `fadeOut` | KEEP | Screen transitions |
+| `scoreCountup` | KEEP | Score display |
+| `shake` | KEEP | Error/invalid action feedback |
+| `action-highlight-fade` | KEEP | Action guide highlight |
+| `pulse-border` | KEEP | Active bot tab highlight |
+| `pulse-border-amber` | KEEP | Immune indicator |
+| `rainbow-rotate` | REMOVE | Retro multicolor effect — replace with static gradient |
+| `rainbow-rotate-fallback` | REMOVE | Fallback for above |
+| `winnerGlow` | REMOVE | Neon glow on winner — replace with clean bold text |
+| `pulse-glow` | REMOVE | Attack target neon glow — replace with subtle border highlight |
+
 ---
 
 ## G. What Gets Removed
@@ -357,6 +455,17 @@ No box-shadows on panels. Shadows are reserved for glass cards only.
 4. `-webkit-backdrop-filter` prefix for Safari support
 5. `.btn-primary` and `.btn-ghost` utility classes
 
+### Button class mapping
+
+| Existing class | New class | Screen |
+|---------------|-----------|--------|
+| `.btn-start-game` | `btn-primary` | Setup |
+| `.btn-view-history` (setup) | `btn-ghost` | Setup |
+| `.btn-next-round` | `btn-primary` | Round-end |
+| `.btn-play-again` | `btn-primary` | Game-end |
+| `.btn-view-history` (game-end) | `btn-ghost` | Game-end |
+| `.btn-back` | `btn-ghost` | History |
+
 ---
 
 ## Files Touched
@@ -365,13 +474,27 @@ No box-shadows on panels. Shadows are reserved for glass cards only.
 |------|--------|
 | `public/index.html` | Add Google Fonts `<link>` tags |
 | `public/style.css` | Full rewrite of design tokens, base styles, card styles, button styles, panel styles, screen styles. Remove scanlines, neon effects, monospace. |
-| `public/ui.js` | Update any inline class references if card class names change (audit needed during implementation) |
+| `public/ui.js` | Required inline style fixes (see below) |
+
+### `ui.js` inline style changes required
+
+| Line | Current | Change to |
+|------|---------|-----------|
+| 166 | `var(--font-mono)` | `var(--font-sans)` |
+| 162 | `rgba(96, 165, 250, 0.3)` | `rgba(96, 165, 250, 0.25)` (match new token) |
+| 176 | `rgba(96, 165, 250, 0.3)` | `rgba(96, 165, 250, 0.25)` |
+
+All other inline `style.*` references use `--sp-*`, `--bg-surface-raised`, `--border-default`, `--text-*` tokens which remain unchanged. The `--card-blue-border` references at lines 163/177 are safe because alias tokens are preserved (see Section A).
 
 ---
 
 ## Execution Notes
 
-- This is a CSS-only change (plus one `<link>` in HTML). No JS logic changes.
-- `ui.js` may need minor class name updates if card rendering uses old class names — audit during implementation.
+- Primarily CSS changes + one `<link>` in HTML + 3 inline style fixes in `ui.js`.
 - All existing tests should pass unchanged (tests don't test CSS).
-- Mobile responsive breakpoints: keep existing breakpoint values, update styles within them to match new design.
+- Preserve the existing `@media (prefers-reduced-motion: reduce)` block — update it to disable the modernized animations (same pattern, new animation names).
+- Mobile responsive breakpoints: keep existing breakpoint values, update styles within them to match new design. Key adjustments:
+  - Bot-zone cards: `backdrop-filter: blur(8px)` (already specified for performance)
+  - At 639px breakpoint: card font sizes scale down, Inter handles small sizes well
+  - At 379px breakpoint: consider `backdrop-filter: blur(4px)` for lowest-end devices
+  - Preserve existing card dimension overrides (`--card-w`, `--card-h`) at each breakpoint
