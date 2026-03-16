@@ -93,6 +93,7 @@ export function renderCard(card, size = 'normal') {
   if (card.immune) classes.push('immune');
 
   const cardEl = el('div', classes);
+  cardEl.style.position = 'relative';
 
   if (size === 'small') {
     cardEl.style.width = 'var(--card-bot-w)';
@@ -101,7 +102,18 @@ export function renderCard(card, size = 'normal') {
   }
 
   if (card.faceUp) {
-    cardEl.textContent = String(card.value);
+    // Card value (centered)
+    const valueSpan = el('span');
+    valueSpan.textContent = String(card.value);
+    cardEl.appendChild(valueSpan);
+
+    // Color label (top-left corner)
+    const colorName = card.color === 'multicolor' ? 'WILD'
+      : card.color === null ? 'NONE'
+      : card.color.toUpperCase();
+    const label = el('span', 'card-color-label');
+    label.textContent = colorName;
+    cardEl.appendChild(label);
   }
 
   return cardEl;
@@ -484,6 +496,12 @@ export function renderGameBoard(container, game, callbacks) {
   }
 
   screen.appendChild(actionBar);
+
+  // ── Action Guide (step-by-step instructions for selected action) ──
+  const guideDiv = el('div', 'action-guide');
+  guideDiv.id = 'action-guide';
+  guideDiv.style.display = 'none';
+  screen.appendChild(guideDiv);
 
   // ── Action Log ──
   const logDiv = el('div', 'action-log');
@@ -1009,6 +1027,47 @@ export function renderStatsScreen(container, sessions, onBack) {
 }
 
 // ── showCheatsheet ────────────────────────────────────────────────────
+
+/**
+ * Show/update the action guide strip below action buttons.
+ * @param {string|null} action — 'construct', 'attack', 'secure', or null to hide
+ * @param {string|null} step — optional step within the action flow
+ */
+export function showActionGuide(action, step) {
+  const guide = document.getElementById('action-guide');
+  if (!guide) return;
+
+  if (!action) {
+    guide.style.display = 'none';
+    return;
+  }
+
+  guide.style.display = 'block';
+  guide.className = 'action-guide';
+
+  if (action === 'construct') {
+    guide.classList.add('action-guide--construct');
+    if (step === 'place') {
+      guide.innerHTML = '<strong>CONSTRUCT</strong> — <span class="step">Step 2</span> Click a card in your grid to replace it with the drawn card';
+    } else if (step === 'reveal') {
+      guide.innerHTML = '<strong>CONSTRUCT</strong> — <span class="step">Step 2</span> Click a face-down card to reveal it (drawn card goes to discard)';
+    } else {
+      guide.innerHTML = '<strong>CONSTRUCT</strong> — <span class="step">Step 1</span> Click the <strong>DECK</strong> to draw a new card, or the <strong>DISCARD</strong> pile to take the top card';
+    }
+  } else if (action === 'attack') {
+    guide.classList.add('action-guide--attack');
+    if (step === 'defender') {
+      guide.innerHTML = '<strong>ATTACK</strong> — <span class="step">Step 2</span> Click an opponent\'s <strong>highlighted card</strong> to steal it';
+    } else if (step === 'cost') {
+      guide.innerHTML = '<strong>ATTACK</strong> — <span class="step">Step 3</span> Click one of your <strong>face-down cards</strong> to reveal as the attack cost';
+    } else {
+      guide.innerHTML = '<strong>ATTACK</strong> — <span class="step">Step 1</span> Click one of your <strong>face-up cards</strong> to swap with an opponent\'s card';
+    }
+  } else if (action === 'secure') {
+    guide.classList.add('action-guide--secure');
+    guide.innerHTML = '<strong>SECURE</strong> — Click a <strong>face-up card</strong> to protect it with a prism (prevents attacks)';
+  }
+}
 
 /**
  * Show a modal overlay with game rules / quick reference.

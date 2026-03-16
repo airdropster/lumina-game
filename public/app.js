@@ -16,6 +16,7 @@ import {
   flashGridCell,
   highlightAttackTargets,
   clearAttackHighlights,
+  showActionGuide,
 } from './ui.js';
 import { saveGameStats, fetchHistory } from './stats.js';
 
@@ -190,6 +191,7 @@ function handleCardClick(row, col) {
         return;
       }
       attackStep = { attackerRow: row, attackerCol: col };
+      showActionGuide('attack', 'defender');
       logAction(document, `Selected your card at (${row + 1},${col + 1}). Now click an opponent's card.`);
       return;
     }
@@ -257,6 +259,7 @@ function handleBotCardClick(botIndex, row, col) {
     attackStep.defenderIndex = botIndex;
     attackStep.defenderRow = row;
     attackStep.defenderCol = col;
+    showActionGuide('attack', 'cost');
     logAction(document, `Targeting ${game.players[botIndex].name}'s card at (${row + 1},${col + 1}). Now reveal a face-down card as cost.`);
   }
 }
@@ -285,10 +288,12 @@ function handleDeckClick() {
     drawnCard,
     () => {
       constructSource = 'deck';
+      showActionGuide('construct', 'place');
       logAction(document, 'Click a card in your grid to replace it with the drawn card.');
     },
     () => {
       constructSource = 'deck_discard';
+      showActionGuide('construct', 'reveal');
       logAction(document, 'Click a face-down card to reveal it. The drawn card goes to discard.');
     }
   );
@@ -317,6 +322,7 @@ function handleDiscardClick() {
 
   constructSource = 'discard';
   const top = game.discard[game.discard.length - 1];
+  showActionGuide('construct', 'place');
   logAction(document, `Picked ${top.value} from discard. Click a card in your grid to replace.`);
 }
 
@@ -333,12 +339,15 @@ function handleActionClick(action) {
   clearAttackHighlights();
 
   if (action === 'construct') {
+    showActionGuide('construct');
     logAction(document, 'CONSTRUCT: Draw from Deck or Discard pile.');
   } else if (action === 'attack') {
     highlightAttackTargets(game, 0);
+    showActionGuide('attack');
     logAction(document, 'ATTACK: Select your face-up card to swap, then an opponent\'s card, then reveal a cost card.');
   } else if (action === 'secure') {
     clearAttackHighlights();
+    showActionGuide('secure');
     logAction(document, 'SECURE: Click a face-up card to place a prism on it.');
   }
 
@@ -352,6 +361,7 @@ function endPlayerTurn() {
   attackStep = null;
   constructSource = null;
   clearAttackHighlights();
+  showActionGuide(null);
 
   // Check for LUMINA flash
   if (game.luminaCaller === 0 && game.phase === PHASE.FINAL_TURNS) {

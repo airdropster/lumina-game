@@ -839,32 +839,25 @@ button {
   box-shadow: 0 0 8px rgba(51, 65, 85, 0.3);
 }
 
-/* -- Prism visual upgrade (rainbow border + shimmer + diamond badge) -- */
+/* -- Prism visual upgrade (corner badge + glow, card color still visible) -- */
 .card.prismed {
   position: relative;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-  box-shadow: 0 0 12px rgba(34, 211, 238, 0.3), inset 0 0 8px rgba(34, 211, 238, 0.15);
-}
-
-.card.prismed::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  background: conic-gradient(from var(--prism-angle, 0deg), #22d3ee, #8b5cf6, #ec4899, #f97316, #22c55e, #22d3ee);
-  z-index: -1;
-  animation: prism-rotate 3s linear infinite;
+  overflow: visible;
+  box-shadow:
+    0 0 10px rgba(34, 211, 238, 0.4),
+    inset 0 0 6px rgba(34, 211, 238, 0.15);
+  animation: prism-glow 2.5s ease-in-out infinite;
 }
 
 .card.prismed::after {
-  content: '\u25C6';
+  content: '◆';
   position: absolute;
   top: 2px;
-  right: 4px;
-  font-size: 0.6rem;
+  right: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
   color: #22d3ee;
-  text-shadow: 0 0 4px rgba(34, 211, 238, 0.8);
+  text-shadow: 0 0 6px rgba(34, 211, 238, 0.9), 0 0 12px rgba(34, 211, 238, 0.5);
   animation: prism-pulse 2s ease-in-out infinite;
 }
 
@@ -874,22 +867,59 @@ button {
   right: 2px;
 }
 
-@keyframes prism-rotate {
-  to {
-    --prism-angle: 360deg;
-  }
-}
-
-/* Fallback rotation using filter for browsers without @property */
-@supports not (background: conic-gradient(from 0deg, red, blue)) {
-  .card.prismed::before {
-    background: linear-gradient(135deg, #22d3ee, #8b5cf6, #ec4899, #f97316, #22c55e, #22d3ee);
-  }
+@keyframes prism-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(34, 211, 238, 0.4), inset 0 0 6px rgba(34, 211, 238, 0.15); }
+  50%      { box-shadow: 0 0 18px rgba(34, 211, 238, 0.6), inset 0 0 10px rgba(34, 211, 238, 0.25); }
 }
 
 @keyframes prism-pulse {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.5; }
+}
+
+/* -- Action Guide Strip (shows step-by-step instructions below action buttons) -- */
+.action-guide {
+  width: 100%;
+  text-align: center;
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.action-guide strong {
+  color: var(--text-primary);
+}
+.action-guide .step {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin: 0 2px;
+  font-size: 0.72rem;
+}
+.action-guide--construct { border-color: var(--btn-construct); }
+.action-guide--attack { border-color: var(--btn-attack); }
+.action-guide--secure { border-color: var(--btn-secure); }
+
+/* -- Card color label -- */
+.card-color-label {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 0.45rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  color: inherit;
+}
+.bot-grid .card-color-label {
+  font-size: 0.35rem;
 }
 
 /* -- Immune card (pulsing amber border) -- */
