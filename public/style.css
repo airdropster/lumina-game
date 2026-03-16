@@ -644,6 +644,32 @@ button {
   box-shadow: 0 0 16px rgba(74, 222, 128, 0.4), 0 0 32px rgba(74, 222, 128, 0.15);
 }
 
+/* Selected (active action) state */
+.action-btn.selected {
+  transform: scale(1.08);
+  border-width: 3px;
+  filter: brightness(1.3);
+  z-index: 1;
+}
+
+.action-btn.btn-construct.selected {
+  background: rgba(96, 165, 250, 0.35);
+  box-shadow: 0 0 20px rgba(96, 165, 250, 0.5), 0 0 40px rgba(96, 165, 250, 0.2), inset 0 0 12px rgba(96, 165, 250, 0.15);
+  color: #fff;
+}
+
+.action-btn.btn-attack.selected {
+  background: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.5), 0 0 40px rgba(239, 68, 68, 0.2), inset 0 0 12px rgba(239, 68, 68, 0.15);
+  color: #fff;
+}
+
+.action-btn.btn-secure.selected {
+  background: rgba(74, 222, 128, 0.35);
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.5), 0 0 40px rgba(74, 222, 128, 0.2), inset 0 0 12px rgba(74, 222, 128, 0.15);
+  color: #fff;
+}
+
 /* Disabled state */
 .action-btn.disabled,
 .action-btn:disabled {
