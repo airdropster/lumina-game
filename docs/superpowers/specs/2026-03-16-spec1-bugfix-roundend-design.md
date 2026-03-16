@@ -25,10 +25,10 @@ Three focused improvements: audit and fix bot attack logic, show all players' fi
    - Defender's received card is marked `immune: true`
    - Cost card (face-down) is flipped face-up
 
-3. **Audit bot attack selection in bot.js** — verify:
-   - Easy bot: `target.card.value > attackerCard.value` check is correct
-   - Medium bot: delta >= 4 threshold is applied correctly
-   - Hard bot: Monte Carlo only considers `target.card.value > attackerCard.value`
+3. **Audit bot attack selection in bot.js** — three code paths to verify:
+   - All difficulties share `buildAttackAction()` which filters `target.card.value > attackerCard.value` as a stupidity floor. Easy picks randomly from valid pairs.
+   - Medium has its own `buildMediumAttackAction()` with `delta >= 4` threshold and leader-targeting.
+   - Hard generates candidates in `generateAllCandidateActions()` filtering `target.card.value > attackerCard.value`, then evaluates via Monte Carlo.
 
 4. **Add attack logging** — in `executeBotTurn()`, log attack details before and after execution:
    ```
@@ -85,12 +85,15 @@ Below all grids: updated running total per player showing progression.
 - Player's own grid: full card size
 - Bot grids: slightly smaller (matching bot-zone sizing during gameplay)
 
+### Scoring data for highlights
+
+Extend `calcRoundScore()` return value to include `validColumns: number[]` and `validRows: number[]` arrays (indices of qualifying columns/rows). This avoids duplicating scoring logic in the UI layer. Update `tests/scoring.test.js` to cover these new fields.
+
 ### Implementation
 
-- New export `renderRoundEndGrids(container, game, scoreBreakdowns)` in `ui.js`
-- Called from existing round-end flow in `app.js` (within or replacing current `renderRoundEnd()`)
+- New export `renderRoundEndGrids(container, game)` in `ui.js` — computes breakdowns internally via `calcRoundScore()` for each player
+- Replace the body of `renderRoundEnd()` to include both the grid panels AND the score table below them, keeping the existing Next Round / Game Over buttons
 - Reuses existing `renderCard()` for card rendering
-- `scoring.js` already provides per-player breakdowns — pass these through
 
 ### CSS classes
 
@@ -105,7 +108,9 @@ Below all grids: updated running total per player showing progression.
 ### Files touched
 - `public/ui.js` — new `renderRoundEndGrids()` function
 - `public/app.js` — wire into round-end flow
+- `public/scoring.js` — extend `calcRoundScore()` to return `validColumns`/`validRows`
 - `public/style.css` — new round-end grid styles
+- `tests/scoring.test.js` — test new `validColumns`/`validRows` fields
 
 ---
 
@@ -117,7 +122,7 @@ Below all grids: updated running total per player showing progression.
 
 - During bot turns: add `bot-tab--active` CSS class to the playing bot's tab in the bot zone
 - Cyan border + subtle pulse animation (consistent with existing turn-banner--player style)
-- Class applied in `renderGameBoard()` by checking `game.currentPlayerIndex` against bot indices
+- Class applied in `renderGameBoard()` by checking `game.currentPlayerIndex` against bot indices. The highlight reflects whose turn it is right now (not who just played).
 
 ### First player indicator
 
