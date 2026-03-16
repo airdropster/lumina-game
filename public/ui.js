@@ -317,6 +317,11 @@ export function renderGameBoard(container, game, callbacks) {
     if (i === game.currentPlayerIndex) classes.push('scoreboard-entry--active');
     const entry = el('div', classes);
     entry.textContent = `${game.players[i].name}: ${game.cumulativeScores[i]}`;
+    if (game.round === 1 && game.turnCount !== undefined && game.turnCount <= game.players.length && i === game.currentPlayerIndex) {
+      const badge = el('span', 'first-player-badge');
+      badge.textContent = '1st';
+      entry.appendChild(badge);
+    }
     scoreboard.appendChild(entry);
   }
   screen.appendChild(scoreboard);
@@ -328,6 +333,9 @@ export function renderGameBoard(container, game, callbacks) {
     const bot = game.players[b];
 
     const tab = el('div', 'bot-tab');
+    if (b === game.currentPlayerIndex) {
+      tab.classList.add('bot-tab--active');
+    }
     tab.setAttribute('role', 'region');
     tab.setAttribute('aria-label', `${bot.name} - ${bot.difficulty}`);
 
@@ -558,73 +566,101 @@ export function renderRoundEnd(container, game, onNext) {
   heading.textContent = `Round ${game.round} Complete`;
   card.appendChild(heading);
 
-  // Score table
-  const table = el('table', 'score-table');
+  // ── Grid panels ──
+  const gridsRow = el('div', 'round-end-grids');
 
-  // Header row
-  const thead = el('thead');
-  const headerRow = el('tr');
-  const headers = ['Player', 'Base', 'Col Bonus', 'Row Bonus', 'Prism Bonus', 'LUMINA', 'Total', 'Cumulative'];
-  for (const h of headers) {
-    const th = el('th');
-    th.textContent = h;
-    if (h === 'Total' || h === 'Cumulative') th.style.textAlign = 'right';
-    headerRow.appendChild(th);
+  // Pre-compute all scores to determine LUMINA bonus
+  const allBreakdowns = game.players.map((p) => calcRoundScore(p.grid));
+  const allTotals = allBreakdowns.map((b) => b.total);
+  let callerLuminaAdj = 0;
+  if (game.luminaCaller !== null && game.luminaCaller !== undefined) {
+    const callerTotal = allTotals[game.luminaCaller];
+    const isStrictlyHighest = allTotals.every((s, idx) => idx === game.luminaCaller || s < callerTotal);
+    callerLuminaAdj = isStrictlyHighest ? 10 : -10;
   }
-  thead.appendChild(headerRow);
-  table.appendChild(thead);
-
-  const tbody = el('tbody');
 
   for (let i = 0; i < game.players.length; i++) {
     const player = game.players[i];
-    const breakdown = calcRoundScore(player.grid);
-
-    // Determine LUMINA bonus/penalty
-    let luminaAdj = 0;
-    if (game.luminaCaller === i) {
-      // Recalculate: check if caller had strictly highest
-      const allTotals = game.players.map((p) => calcRoundScore(p.grid).total);
-      const callerTotal = allTotals[i];
-      const isStrictlyHighest = allTotals.every((s, idx) => idx === i || s < callerTotal);
-      luminaAdj = isStrictlyHighest ? 10 : -10;
-    }
-
+    const breakdown = allBreakdowns[i];
+    const isCaller = game.luminaCaller === i;
+    const luminaAdj = isCaller ? callerLuminaAdj : 0;
     const roundTotal = breakdown.total + luminaAdj;
 
-    const row = el('tr', i === 0 ? 'player-row' : '');
-
-    const cells = [
-      player.name,
-      breakdown.baseScore,
-      breakdown.columnBonus,
-      breakdown.rowBonus,
-      breakdown.prismBonus,
-      luminaAdj,
-      roundTotal,
-      game.cumulativeScores[i],
-    ];
-
-    for (let c = 0; c < cells.length; c++) {
-      const td = el('td');
-      const val = cells[c];
-      td.textContent = String(val);
-
-      // Highlight bonuses and penalties
-      if (c >= 2 && c <= 5 && typeof val === 'number') {
-        if (val > 0) td.classList.add('bonus-highlight');
-        else if (val < 0) td.classList.add('penalty-highlight');
-      }
-      if (c === 6 || c === 7) td.style.textAlign = 'right';
-
-      row.appendChild(td);
+    const panel = el('div', 'round-end-panel');
+    if (i === 0) panel.classList.add('round-end-panel--player');
+    if (isCaller) {
+      panel.classList.add(callerLuminaAdj >= 0 ? 'round-end-panel--caller-positive' : 'round-end-panel--caller-negative');
     }
 
-    tbody.appendChild(row);
+    // Header
+    const header = el('div', 'round-end-panel-header');
+    header.textContent = player.name;
+    if (player.isBot) {
+      const badge = el('span', 'difficulty-badge');
+      badge.textContent = ` (${player.difficulty})`;
+      header.appendChild(badge);
+    }
+    panel.appendChild(header);
+
+    // LUMINA caller banner
+    if (isCaller) {
+      const banner = el('div', 'lumina-caller-banner');
+      banner.classList.add(callerLuminaAdj >= 0 ? 'lumina-caller-banner--positive' : 'lumina-caller-banner--negative');
+      banner.textContent = `CALLED LUMINA (${callerLuminaAdj >= 0 ? '+' : ''}${callerLuminaAdj})`;
+      panel.appendChild(banner);
+    }
+
+    // Grid with bonus highlights
+    const gridDiv = el('div', 'round-end-grid');
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 4; c++) {
+        const cardEl = renderCard(player.grid[r][c]);
+        if (breakdown.validColumns && breakdown.validColumns.includes(c)) {
+          cardEl.classList.add('bonus-col-highlight');
+        }
+        if (breakdown.validRows && breakdown.validRows.includes(r)) {
+          cardEl.classList.add('bonus-row-highlight');
+        }
+        gridDiv.appendChild(cardEl);
+      }
+    }
+    panel.appendChild(gridDiv);
+
+    // Score breakdown
+    const bdDiv = el('div', 'round-end-breakdown');
+    const items = [
+      { label: `Base: ${breakdown.baseScore}`, cls: '' },
+      { label: `Col: +${breakdown.columnBonus}`, cls: breakdown.columnBonus > 0 ? 'breakdown-item--bonus' : '' },
+      { label: `Row: +${breakdown.rowBonus}`, cls: breakdown.rowBonus > 0 ? 'breakdown-item--bonus' : '' },
+      { label: `Prism: +${breakdown.prismBonus}`, cls: breakdown.prismBonus > 0 ? 'breakdown-item--bonus' : '' },
+    ];
+    if (luminaAdj !== 0) {
+      items.push({ label: `LUMINA: ${luminaAdj > 0 ? '+' : ''}${luminaAdj}`, cls: luminaAdj > 0 ? 'breakdown-item--bonus' : 'breakdown-item--penalty' });
+    }
+    items.push({ label: `Total: ${roundTotal}`, cls: 'breakdown-total' });
+
+    for (const item of items) {
+      const classes = ['breakdown-item'];
+      if (item.cls) classes.push(item.cls);
+      const span = el('span', classes);
+      span.textContent = item.label;
+      bdDiv.appendChild(span);
+    }
+    panel.appendChild(bdDiv);
+
+    gridsRow.appendChild(panel);
   }
 
-  table.appendChild(tbody);
-  card.appendChild(table);
+  card.appendChild(gridsRow);
+
+  // Cumulative scores
+  const cumDiv = el('div', 'round-end-cumulative');
+  for (let i = 0; i < game.players.length; i++) {
+    const span = el('span');
+    span.innerHTML = `${game.players[i].name}: <strong>${game.cumulativeScores[i]}</strong>`;
+    cumDiv.appendChild(span);
+  }
+  card.appendChild(cumDiv);
 
   // Next button
   const isGameOver = game.isGameOver();

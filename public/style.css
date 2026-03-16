@@ -427,6 +427,26 @@ button {
   color: var(--card-orange-border);
 }
 
+/* -- Active Bot Highlight -- */
+.bot-tab--active {
+  border-color: var(--prism-cyan) !important;
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.4), inset 0 0 6px rgba(34, 211, 238, 0.1);
+  animation: pulse-border 1.5s ease-in-out infinite;
+}
+
+/* -- First Player Badge -- */
+.first-player-badge {
+  display: inline-block;
+  font-size: 0.55rem;
+  font-weight: 700;
+  background: var(--prism-cyan);
+  color: var(--bg-surface);
+  padding: 1px 5px;
+  border-radius: 8px;
+  margin-left: var(--sp-1);
+  vertical-align: middle;
+}
+
 .bot-grid {
   display: grid;
   grid-template-columns: repeat(4, var(--card-bot-w));
@@ -1185,6 +1205,144 @@ button {
   color: var(--text-primary);
   margin-bottom: var(--sp-6);
   text-shadow: 0 0 12px rgba(96, 165, 250, 0.3);
+}
+
+/* -- Round-End Grid Panels -- */
+.round-end-grids {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  overflow-x: auto;
+  padding: var(--sp-4) 0;
+  margin-bottom: var(--sp-4);
+}
+
+.round-end-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  min-width: 180px;
+}
+
+.round-end-panel--player {
+  border-color: var(--card-blue-border);
+}
+
+.round-end-panel--caller-positive {
+  border-color: #22c55e;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+}
+
+.round-end-panel--caller-negative {
+  border-color: #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+}
+
+.round-end-panel-header {
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.round-end-panel-header .difficulty-badge {
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: var(--sp-1);
+}
+
+.lumina-caller-banner {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.lumina-caller-banner--positive {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.lumina-caller-banner--negative {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.round-end-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+}
+
+.round-end-grid .card {
+  width: 44px;
+  height: 56px;
+  font-size: 0.75rem;
+}
+
+.round-end-panel--player .round-end-grid .card {
+  width: 56px;
+  height: 68px;
+  font-size: 0.85rem;
+}
+
+.bonus-col-highlight {
+  border-left: 3px solid var(--prism-cyan) !important;
+}
+
+.bonus-row-highlight {
+  border-bottom: 3px solid #f59e0b !important;
+}
+
+.round-end-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.round-end-breakdown .breakdown-item {
+  white-space: nowrap;
+}
+
+.round-end-breakdown .breakdown-item--bonus {
+  color: #22c55e;
+}
+
+.round-end-breakdown .breakdown-item--penalty {
+  color: #ef4444;
+}
+
+.round-end-breakdown .breakdown-total {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.round-end-cumulative {
+  display: flex;
+  gap: var(--sp-4);
+  justify-content: center;
+  font-size: 0.8rem;
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.round-end-cumulative span {
+  color: var(--text-secondary);
+}
+
+.round-end-cumulative strong {
+  color: var(--text-primary);
 }
 
 /* Score breakdown table */

@@ -475,9 +475,10 @@ function executeBotTurn() {
     const defName = game.players[action.defenderIndex].name;
     const aBadge = _badge(attackerCard.value, attackerCard.color);
     const dBadge = _badge(defenderCard.value, defenderCard.color);
-    logRichAction(document, { actor: bot.name, actionType: 'swapped', details: `${aBadge} \u2194 ${dBadge} from ${defName}, revealed (${action.revealRow + 1},${action.revealCol + 1})` });
-    flashGridCell(botIndex, action.revealRow, action.revealCol);
+    logRichAction(document, { actor: bot.name, actionType: 'attacked', details: `gave ${aBadge} to ${defName}, took ${dBadge}, revealed (${action.revealRow + 1},${action.revealCol + 1})` });
+    flashGridCell(botIndex, action.attackerRow, action.attackerCol);
     flashGridCell(action.defenderIndex, action.defenderRow, action.defenderCol);
+    flashGridCell(botIndex, action.revealRow, action.revealCol);
   } else if (action.type === 'secure') {
     const sBadge = _badge(secureCard.value, secureCard.color);
     logRichAction(document, { actor: bot.name, actionType: 'secured', details: `${sBadge} with prism` });

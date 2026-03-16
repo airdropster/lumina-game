@@ -366,6 +366,37 @@ describe('attack', () => {
     assert.equal(g.players[pi].stats.attacksMade, 1);
   });
 
+  it('correctly swaps card values between attacker and defender', () => {
+    const g = setupPlayingGame();
+    const pi = g.currentPlayerIndex;
+    const di = pi === 0 ? 1 : 0;
+
+    // Set up known card values
+    g.players[pi].grid[0][0] = {
+      value: 3, color: 'blue', faceUp: true, hasPrism: false, immune: false,
+    };
+    g.players[di].grid[0][0] = {
+      value: 12, color: 'orange', faceUp: true, hasPrism: false, immune: false,
+    };
+    // Ensure a face-down cost card exists
+    g.players[pi].grid[2][3].faceUp = false;
+
+    const result = g.attack(pi, 0, 0, di, 0, 0, 2, 3);
+    assert.equal(result, true, 'attack should succeed');
+
+    // Attacker now has the defender's old card
+    assert.equal(g.players[pi].grid[0][0].value, 12, 'attacker should have defender card value');
+    assert.equal(g.players[pi].grid[0][0].color, 'orange', 'attacker should have defender card color');
+
+    // Defender now has the attacker's old card, marked immune
+    assert.equal(g.players[di].grid[0][0].value, 3, 'defender should have attacker card value');
+    assert.equal(g.players[di].grid[0][0].color, 'blue', 'defender should have attacker card color');
+    assert.equal(g.players[di].grid[0][0].immune, true, 'defender card should be immune');
+
+    // Cost card is now face-up
+    assert.equal(g.players[pi].grid[2][3].faceUp, true, 'cost card should be face-up');
+  });
+
   it('cannot attack a prismed card', () => {
     const g = setupPlayingGame();
     const pi = g.currentPlayerIndex;

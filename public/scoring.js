@@ -151,6 +151,31 @@ export function calcRoundScore(grid) {
   const prismBonus = calcPrismBonus(grid);
   const total = baseScore + columnBonus + rowBonus + prismBonus;
 
+  // Determine valid structure indices for UI highlights
+  const validColumns = [];
+  for (let col = 0; col < 4; col++) {
+    const cards = [grid[0][col], grid[1][col], grid[2][col]];
+    if (cards.some((cc) => !cc.faceUp)) continue;
+    if (cards.some((cc) => cc.color === null)) continue;
+    const concreteColors = cards
+      .filter((cc) => cc.color !== 'multicolor')
+      .map((cc) => cc.color);
+    if (concreteColors.length === 0 || concreteColors.every((cc) => cc === concreteColors[0])) {
+      validColumns.push(col);
+    }
+  }
+
+  const validRows = [];
+  for (let row = 0; row < 3; row++) {
+    const cards = grid[row];
+    if (cards.some((cc) => !cc.faceUp)) continue;
+    let increasing = true;
+    for (let i = 1; i < 4; i++) {
+      if (cards[i].value <= cards[i - 1].value) { increasing = false; break; }
+    }
+    if (increasing) validRows.push(row);
+  }
+
   return {
     visibleSum,
     faceDownCount,
@@ -159,6 +184,8 @@ export function calcRoundScore(grid) {
     columnBonus,
     rowBonus,
     prismBonus,
+    validColumns,
+    validRows,
     total,
   };
 }

@@ -252,3 +252,42 @@ describe('calcRoundScore', () => {
     assert.equal(result.total, 61 + 40 + 10 + 10);
   });
 });
+
+// ── calcRoundScore validColumns and validRows ───────────────────────
+
+describe('calcRoundScore validColumns and validRows', () => {
+  it('returns validColumns for same-color columns', () => {
+    // Column 0: all blue → valid. Column 1: mixed → invalid.
+    const grid = makeGrid({
+      '0,0': c(3, 'blue'),
+      '1,0': c(5, 'blue'),
+      '2,0': c(8, 'blue'),
+      '0,1': c(3, 'blue'),
+      '1,1': c(5, 'orange'),
+      '2,1': c(8, 'blue'),
+    });
+    const result = calcRoundScore(grid);
+    assert.ok(result.validColumns.includes(0), 'column 0 should be valid');
+    assert.ok(!result.validColumns.includes(1), 'column 1 should not be valid');
+  });
+
+  it('returns validRows for ascending rows', () => {
+    const grid = makeGrid({
+      '0,0': c(1, 'blue'),
+      '0,1': c(3, 'orange'),
+      '0,2': c(5, 'green'),
+      '0,3': c(7, 'violet'),
+    });
+    const result = calcRoundScore(grid);
+    assert.ok(result.validRows.includes(0), 'row 0 should be valid');
+    assert.ok(!result.validRows.includes(1), 'row 1 should not be valid (all 5s)');
+  });
+
+  it('returns empty arrays when no valid structures', () => {
+    const grid = makeGrid(); // all 5, blue → columns valid but rows not ascending
+    const result = calcRoundScore(grid);
+    assert.ok(Array.isArray(result.validColumns));
+    assert.ok(Array.isArray(result.validRows));
+    assert.deepEqual(result.validRows, []);
+  });
+});
