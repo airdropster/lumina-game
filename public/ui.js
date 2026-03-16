@@ -486,12 +486,14 @@ export function renderGameBoard(container, game, callbacks) {
     { key: 'secure', label: 'SECURE', cssClass: 'btn-secure' },
   ];
 
+  const isPlayerTurn = game.currentPlayerIndex === 0 && game.phase !== PHASE.REVEAL && game.phase !== PHASE.SCORING;
+
   for (const def of actionDefs) {
     const btn = el('button', ['action-btn', def.cssClass]);
     btn.textContent = def.label;
     btn.setAttribute('aria-label', `${def.label} action`);
 
-    if (!availableActions.includes(def.key)) {
+    if (!isPlayerTurn || !availableActions.includes(def.key)) {
       btn.classList.add('disabled');
       btn.disabled = true;
     }
