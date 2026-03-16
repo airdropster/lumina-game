@@ -907,7 +907,7 @@ button {
   }
 }
 
-/* -- LUMINA Flash (full-screen flash + text) -- */
+/* LUMINA Flash — clean frosted overlay */
 .lumina-flash {
   position: fixed;
   inset: 0;
@@ -915,42 +915,26 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
+  background: rgba(2, 6, 23, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   animation: luminaFlash 1.5s ease forwards;
 }
 
 .lumina-flash::before {
-  content: 'LUMINA!';
-  font-size: 5rem;
+  content: 'LUMINA';
+  font-family: var(--font-sans);
+  font-size: 4rem;
   font-weight: 700;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow:
-    0 0 20px var(--card-blue-border),
-    0 0 40px var(--card-violet-border),
-    0 0 60px var(--card-orange-border),
-    0 0 80px var(--card-green-border);
+  color: #f8fafc;
+  letter-spacing: 0.2em;
 }
 
 @keyframes luminaFlash {
-  0% {
-    background: rgba(255, 255, 255, 0.8);
-    opacity: 1;
-  }
-  15% {
-    background: rgba(96, 165, 250, 0.3);
-  }
-  30% {
-    background: rgba(167, 139, 250, 0.2);
-  }
-  60% {
-    opacity: 1;
-  }
-  100% {
-    background: transparent;
-    opacity: 0;
-  }
+  0%   { opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* -- Score Count-up (hook for JS) -- */
@@ -1041,7 +1025,6 @@ button {
   padding: var(--sp-8);
   max-width: 600px;
   width: 100%;
-  box-shadow: 0 0 40px rgba(26, 10, 46, 0.5);
 }
 
 .round-end-card h2 {
@@ -1051,7 +1034,6 @@ button {
   letter-spacing: 0.2em;
   color: var(--text-primary);
   margin-bottom: var(--sp-6);
-  text-shadow: 0 0 12px rgba(96, 165, 250, 0.3);
 }
 
 /* -- Round-End Grid Panels -- */
@@ -1082,12 +1064,10 @@ button {
 
 .round-end-panel--caller-positive {
   border-color: #22c55e;
-  box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
 }
 
 .round-end-panel--caller-negative {
   border-color: #ef4444;
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
 }
 
 .round-end-panel-header {
@@ -1233,33 +1213,29 @@ button {
 
 .score-table .bonus-highlight {
   color: var(--card-green-border);
-  text-shadow: 0 0 6px rgba(74, 222, 128, 0.3);
 }
 
 .score-table .penalty-highlight {
   color: var(--btn-attack);
-  text-shadow: 0 0 6px rgba(239, 68, 68, 0.3);
 }
 
 .btn-next-round {
   display: block;
   width: 100%;
   padding: var(--sp-3) var(--sp-6);
-  background: rgba(96, 165, 250, 0.15);
-  border: 2px solid var(--card-blue-border);
+  background: #f8fafc;
+  border: none;
   border-radius: 8px;
-  color: var(--card-blue-border);
+  color: #0f172a;
   font-size: 0.9rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.15em;
   transition: all var(--t-fast);
-  box-shadow: 0 0 8px rgba(96, 165, 250, 0.2);
 }
 
 .btn-next-round:hover {
-  background: rgba(96, 165, 250, 0.25);
-  box-shadow: 0 0 16px rgba(96, 165, 250, 0.4);
+  background: #e2e8f0;
   transform: translateY(-2px);
 }
 
@@ -1282,33 +1258,6 @@ button {
   text-align: center;
   position: relative;
   overflow: hidden;
-  box-shadow:
-    0 0 60px rgba(96, 165, 250, 0.1),
-    0 0 120px rgba(167, 139, 250, 0.05);
-}
-
-/* Dramatic corner glows */
-.game-end-card::before,
-.game-end-card::after {
-  content: '';
-  position: absolute;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.15;
-}
-
-.game-end-card::before {
-  top: -80px;
-  left: -80px;
-  background: var(--card-blue-border);
-}
-
-.game-end-card::after {
-  bottom: -80px;
-  right: -80px;
-  background: var(--card-violet-border);
 }
 
 .winner-announcement {
@@ -1328,25 +1277,7 @@ button {
 .winner-announcement .winner-name {
   font-size: 2rem;
   font-weight: 700;
-  color: #fbbf24;
-  text-shadow:
-    0 0 20px rgba(251, 191, 36, 0.5),
-    0 0 40px rgba(251, 191, 36, 0.2);
-  animation: winnerGlow 2s ease-in-out infinite;
-}
-
-@keyframes winnerGlow {
-  0%, 100% {
-    text-shadow:
-      0 0 20px rgba(251, 191, 36, 0.5),
-      0 0 40px rgba(251, 191, 36, 0.2);
-  }
-  50% {
-    text-shadow:
-      0 0 30px rgba(251, 191, 36, 0.7),
-      0 0 60px rgba(251, 191, 36, 0.3),
-      0 0 80px rgba(251, 191, 36, 0.1);
-  }
+  color: var(--text-primary);
 }
 
 .winner-announcement .winner-score {
@@ -1400,25 +1331,38 @@ button {
   position: relative;
   z-index: 1;
   display: inline-block;
-  padding: var(--sp-4) var(--sp-10);
-  background: linear-gradient(135deg, var(--card-blue-border), var(--card-violet-border));
-  color: white;
-  font-size: 1rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  border-radius: 8px;
-  transition: all var(--t-normal);
-  box-shadow: 0 0 20px rgba(96, 165, 250, 0.3);
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 6px;
+  transition: all var(--t-fast);
 }
 
 .btn-play-again:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 30px rgba(96, 165, 250, 0.5), 0 0 60px rgba(167, 139, 250, 0.2);
+  background: #e2e8f0;
+  transform: translateY(-1px);
 }
 
 .btn-play-again:active {
   transform: translateY(0) scale(0.98);
+}
+
+.btn-view-history {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  background: transparent;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  padding: 8px 16px;
+  border-radius: 6px;
+  transition: all var(--t-fast);
+}
+
+.btn-view-history:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-1px);
 }
 
 /* ------------------------------------------------------------
