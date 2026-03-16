@@ -1,58 +1,43 @@
 /* ============================================================
-   LUMINA — Retro Arcade Theme
-   A neon-lit, deep-space card game aesthetic
+   LUMINA — Modern Dark Theme
+   Slate palette, Inter font, shadcn-inspired
    ============================================================ */
 
 /* ------------------------------------------------------------
    1. CSS CUSTOM PROPERTIES (Design Tokens)
    ------------------------------------------------------------ */
 :root {
-  /* Background */
-  --bg-deep: #1a0a2e;
-  --bg-space: #0d1b2a;
+  /* Backgrounds — Slate scale */
+  --bg-deep: #020617;
   --bg-surface: #0f172a;
   --bg-surface-raised: #1e293b;
-  --bg-overlay: rgba(13, 27, 42, 0.92);
+  --bg-overlay: rgba(15, 23, 42, 0.92);
 
   /* Card Colors — Blue */
-  --card-blue-bg: #1e3a5f;
   --card-blue-border: #60a5fa;
-  --card-blue-glow: 0 0 8px #60a5fa;
 
   /* Card Colors — Violet */
-  --card-violet-bg: #312e81;
   --card-violet-border: #a78bfa;
-  --card-violet-glow: 0 0 8px #a78bfa;
 
   /* Card Colors — Orange */
-  --card-orange-bg: #431407;
   --card-orange-border: #fb923c;
-  --card-orange-glow: 0 0 8px #fb923c;
 
   /* Card Colors — Green */
-  --card-green-bg: #14532d;
   --card-green-border: #4ade80;
-  --card-green-glow: 0 0 8px #4ade80;
 
-  /* Card Colors — Multicolor */
-  --card-multi-bg: linear-gradient(135deg, #1e3a5f, #312e81, #431407, #14532d);
-
-  /* Card Colors — No color (15) */
-  --card-neutral-bg: #1e293b;
+  /* Card Colors — Neutral (15) */
   --card-neutral-border: #e2e8f0;
-  --card-neutral-glow: 0 0 6px rgba(226, 232, 240, 0.4);
 
   /* Face-down card */
-  --card-facedown-bg: #0f172a;
   --card-facedown-border: #334155;
 
   /* Prism */
   --prism-cyan: #22d3ee;
-  --prism-glow: 0 0 10px #22d3ee, 0 0 20px rgba(34, 211, 238, 0.3);
+  --prism-glow: 0 0 8px rgba(34, 211, 238, 0.4);
 
   /* Immune */
   --immune-amber: #f59e0b;
-  --immune-glow: 0 0 10px #f59e0b, 0 0 20px rgba(245, 158, 11, 0.4);
+  --immune-glow: 0 0 8px rgba(245, 158, 11, 0.4);
 
   /* Action Buttons */
   --btn-construct: #60a5fa;
@@ -60,17 +45,16 @@
   --btn-secure: #4ade80;
 
   /* Text */
-  --text-primary: #f1f5f9;
+  --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
-  --text-accent: #e0e7ff;
 
-  /* Borders & Surfaces */
+  /* Borders */
   --border-subtle: #1e293b;
   --border-default: #334155;
 
   /* Typography */
-  --font-mono: 'Courier New', 'Fira Code', 'Consolas', monospace;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 
   /* Spacing */
   --sp-1: 4px;
@@ -87,7 +71,7 @@
   /* Card Dimensions */
   --card-w: 60px;
   --card-h: 84px;
-  --card-radius: 8px;
+  --card-radius: 10px;
   --card-bot-w: 45px;
   --card-bot-h: 63px;
 
@@ -104,9 +88,7 @@
   --z-flash: 300;
 }
 
-/* ------------------------------------------------------------
-   2. RESET & BASE
-   ------------------------------------------------------------ */
+/* -- 2. RESET & BASE -- */
 *,
 *::before,
 *::after {
@@ -122,28 +104,12 @@ html {
 }
 
 body {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-primary);
-  background: linear-gradient(160deg, var(--bg-deep) 0%, var(--bg-space) 100%);
+  background: var(--bg-deep);
   min-height: 100vh;
   line-height: 1.5;
   overflow-x: hidden;
-}
-
-/* Scanline overlay for arcade feel */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.03) 2px,
-    rgba(0, 0, 0, 0.03) 4px
-  );
 }
 
 a {
@@ -156,30 +122,17 @@ a:hover {
 }
 
 button {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   cursor: pointer;
   border: none;
   background: none;
   color: inherit;
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--bg-surface);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-default);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
-}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-surface); }
+::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* ------------------------------------------------------------
    3. SCREEN CONTAINER SYSTEM
