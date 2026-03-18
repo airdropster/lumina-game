@@ -25,25 +25,30 @@ function shuffle(array) {
  *
  * @returns {{ value: number, color: string|null }[]}
  */
-export function createDeck() {
+export function createDeck(config = {}) {
+  const cardMin = config.cardMin ?? 1;
+  const cardMax = config.cardMax ?? 12;
+  const negativeValue = config.negativeValue ?? -2;
+  const topValue = config.topValue ?? 15;
+
   const deck = [];
 
-  // 96 vector cards: 12 values x 4 colors x 2 copies
+  // Vector cards: (cardMax - cardMin + 1) values x 4 colors x 2 copies
   for (const color of COLORS) {
-    for (let value = 1; value <= 12; value++) {
+    for (let value = cardMin; value <= cardMax; value++) {
       deck.push({ value, color });
       deck.push({ value, color });
     }
   }
 
-  // 8 multicolor -2 cards
+  // 8 multicolor negative cards
   for (let i = 0; i < 8; i++) {
-    deck.push({ value: -2, color: 'multicolor' });
+    deck.push({ value: negativeValue, color: 'multicolor' });
   }
 
-  // 8 colorless 15 cards
+  // 8 colorless top cards
   for (let i = 0; i < 8; i++) {
-    deck.push({ value: 15, color: null });
+    deck.push({ value: topValue, color: null });
   }
 
   return shuffle(deck);

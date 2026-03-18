@@ -72,5 +72,37 @@ describe('Card and Deck module', () => {
         assert.deepEqual(keys, ['color', 'value']);
       }
     });
+
+    it('should accept config to customize card range', () => {
+      const deck = createDeck({ cardMin: 1, cardMax: 5 });
+      const vectors = deck.filter(
+        (c) => c.value >= 1 && c.value <= 5 && COLORS.includes(c.color)
+      );
+      assert.equal(vectors.length, 40);
+      assert.equal(deck.length, 56);
+    });
+
+    it('should accept config to customize negative card value', () => {
+      const deck = createDeck({ negativeValue: -5 });
+      const multi = deck.filter((c) => c.value === -5 && c.color === 'multicolor');
+      assert.equal(multi.length, 8);
+      const oldMulti = deck.filter((c) => c.value === -2 && c.color === 'multicolor');
+      assert.equal(oldMulti.length, 0);
+    });
+
+    it('should accept config to customize top card value', () => {
+      const deck = createDeck({ topValue: 20 });
+      const top = deck.filter((c) => c.value === 20 && c.color === null);
+      assert.equal(top.length, 8);
+      const oldTop = deck.filter((c) => c.value === 15 && c.color === null);
+      assert.equal(oldTop.length, 0);
+    });
+
+    it('should use defaults when config is empty or omitted', () => {
+      const deck1 = createDeck();
+      const deck2 = createDeck({});
+      assert.equal(deck1.length, 112);
+      assert.equal(deck2.length, 112);
+    });
   });
 });
