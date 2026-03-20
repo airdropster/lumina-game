@@ -20,6 +20,11 @@ export function startServer(port = 3000, dbPath = 'data/lumina.db') {
   app.use(express.json());
   app.use(express.static(join(__dirname, 'public')));
 
+  // Serve simulator at clean URL
+  app.get('/simulator', (_req, res) => {
+    res.sendFile(join(__dirname, 'public', 'simulator.html'));
+  });
+
   // Save a game session with round stats
   app.post('/api/stats/save', (req, res) => {
     const { session, rounds } = req.body;
