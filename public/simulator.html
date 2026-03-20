@@ -83,10 +83,35 @@
           <div class="stat-card"><span class="stat-value" id="stat-rounds">—</span><span class="stat-label">Avg Rounds</span></div>
           <div class="stat-card"><span class="stat-value" id="stat-lumina">—</span><span class="stat-label">LUMINA Rate</span></div>
           <div class="stat-card"><span class="stat-value" id="stat-winning">—</span><span class="stat-label">Avg Win Score</span></div>
+          <div class="stat-card"><span class="stat-value" id="stat-median">—</span><span class="stat-label">Median Score</span></div>
+          <div class="stat-card"><span class="stat-value" id="stat-stddev">—</span><span class="stat-label">Score Std Dev</span></div>
+          <div class="stat-card"><span class="stat-value" id="stat-range">—</span><span class="stat-label">Score Range</span></div>
+          <div class="stat-card"><span class="stat-value" id="stat-turns">—</span><span class="stat-label">Avg Turns/Round</span></div>
         </div>
         <div class="chart-container"><canvas id="chart-winrate"></canvas></div>
         <div class="chart-container"><canvas id="chart-breakdown"></canvas></div>
         <div class="chart-container"><canvas id="chart-progression"></canvas></div>
+        <div class="chart-container"><canvas id="chart-histogram"></canvas></div>
+        <div class="chart-container chart-container-sm"><canvas id="chart-donut"></canvas></div>
+
+        <details class="detail-section">
+          <summary>Detailed Statistics</summary>
+          <div class="detail-tables">
+            <div id="player-stats-table"></div>
+          </div>
+        </details>
+
+        <div id="ai-section" class="ai-section hidden">
+          <button id="analyze-btn" class="btn-primary">Analyze with AI</button>
+          <div id="ai-loading" class="hidden">
+            <span class="spinner"></span> Analyzing with Gemini...
+          </div>
+          <div id="ai-result" class="hidden">
+            <h3>AI Balance Analysis</h3>
+            <div id="ai-text"></div>
+            <button id="reanalyze-btn" class="btn-ghost">Re-analyze</button>
+          </div>
+        </div>
       </div>
     </section>
   </main>

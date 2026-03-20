@@ -9,7 +9,7 @@ const DEFAULTS = {
 
 const DIFF_COLORS = { easy: '#4ade80', medium: '#fbbf24', hard: '#ef4444' };
 
-let charts = { winrate: null, breakdown: null, progression: null };
+let charts = { winrate: null, breakdown: null, progression: null, histogram: null, donut: null };
 
 // DOM ref helper
 const $ = (id) => document.getElementById(id);
@@ -187,6 +187,21 @@ function renderResults(results, params) {
     summary.avgScore.reduce((a, b) => a + b, 0) / summary.avgScore.length;
   $('stat-winning').textContent = Math.round(avgWinScore);
 
+  // New stat cards
+  const globalMedian = Math.round(
+    summary.perPlayer.reduce((s, p) => s + p.medianScore, 0) / params.playerCount
+  );
+  const globalStdDev = Math.round(
+    summary.perPlayer.reduce((s, p) => s + p.stdDev, 0) / params.playerCount
+  );
+  const globalMin = Math.min(...summary.perPlayer.map((p) => p.minScore));
+  const globalMax = Math.max(...summary.perPlayer.map((p) => p.maxScore));
+
+  $('stat-median').textContent = globalMedian;
+  $('stat-stddev').textContent = globalStdDev;
+  $('stat-range').textContent = `${globalMin} – ${globalMax}`;
+  $('stat-turns').textContent = summary.roundStats.avgTurns.toFixed(1);
+
   // Destroy old charts
   Object.values(charts).forEach((c) => c?.destroy());
 
@@ -239,24 +254,111 @@ function renderResults(results, params) {
     options: chartOptions('Avg Score Breakdown (per round)', { stacked: true }),
   });
 
-  // Score Progression line chart
+  // Score Progression line chart with min/max bands
   const maxRounds = summary.avgScoreByRound.length;
   const roundLabels = Array.from({ length: maxRounds }, (_, i) => `R${i + 1}`);
-  const datasets = params.difficulties.map((d, i) => ({
-    label: `Bot ${i + 1}`,
-    data: summary.avgScoreByRound.map((r) =>
-      r[i] !== undefined ? +r[i].toFixed(0) : null
-    ),
-    borderColor: DIFF_COLORS[d],
-    backgroundColor: 'transparent',
-    tension: 0.3,
-  }));
+
+  const progressionDatasets = [];
+  for (let i = 0; i < params.playerCount; i++) {
+    const color = DIFF_COLORS[params.difficulties[i]];
+    progressionDatasets.push({
+      label: `Bot ${i + 1} min`,
+      data: summary.scoreProgressionBands.map((b) => b.min[i] ?? 0),
+      borderColor: 'transparent',
+      backgroundColor: 'transparent',
+      pointRadius: 0,
+      fill: false,
+    });
+    progressionDatasets.push({
+      label: `Bot ${i + 1} range`,
+      data: summary.scoreProgressionBands.map((b) => b.max[i] ?? 0),
+      borderColor: 'transparent',
+      backgroundColor: color + '15',
+      pointRadius: 0,
+      fill: '-1',
+    });
+    progressionDatasets.push({
+      label: `Bot ${i + 1}`,
+      data: summary.avgScoreByRound.map((r) => r[i] !== undefined ? +r[i].toFixed(0) : null),
+      borderColor: color,
+      backgroundColor: 'transparent',
+      tension: 0.3,
+      pointRadius: 2,
+    });
+  }
 
   charts.progression = new Chart($('chart-progression'), {
     type: 'line',
-    data: { labels: roundLabels, datasets },
-    options: chartOptions('Score Progression (avg cumulative)'),
+    data: { labels: roundLabels, datasets: progressionDatasets },
+    options: {
+      responsive: true,
+      plugins: {
+        title: { display: true, text: 'Score Progression (avg with range)', color: '#f8fafc', font: { size: 14 } },
+        legend: {
+          labels: {
+            color: '#94a3b8',
+            filter: (item) => !item.text.includes('min') && !item.text.includes('range'),
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+        y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+      },
+    },
   });
+
+  // Score Distribution Histogram
+  const histLabels = summary.scoreDistribution[0].map(
+    (b) => `${Math.round(b.min)}-${Math.round(b.max)}`
+  );
+  const histDatasets = params.difficulties.map((d, i) => ({
+    label: `Bot ${i + 1}`,
+    data: summary.scoreDistribution[i].map((b) => b.count),
+    backgroundColor: DIFF_COLORS[d] + '99',
+  }));
+
+  charts.histogram = new Chart($('chart-histogram'), {
+    type: 'bar',
+    data: { labels: histLabels, datasets: histDatasets },
+    options: chartOptions('Score Distribution'),
+  });
+
+  // Bonus Contribution Donut (aggregated across players)
+  const avgContrib = { base: 0, column: 0, row: 0, prism: 0 };
+  for (const bc of summary.bonusContributions) {
+    avgContrib.base += bc.base;
+    avgContrib.column += bc.column;
+    avgContrib.row += bc.row;
+    avgContrib.prism += bc.prism;
+  }
+  const n = summary.bonusContributions.length || 1;
+
+  charts.donut = new Chart($('chart-donut'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Base', 'Column', 'Row', 'Prism'],
+      datasets: [{
+        data: [
+          +(avgContrib.base / n * 100).toFixed(1),
+          +(avgContrib.column / n * 100).toFixed(1),
+          +(avgContrib.row / n * 100).toFixed(1),
+          +(avgContrib.prism / n * 100).toFixed(1),
+        ],
+        backgroundColor: ['#94a3b8', '#4ade80', '#60a5fa', '#a78bfa'],
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: { display: true, text: 'Bonus Contribution (%)', color: '#f8fafc', font: { size: 14 } },
+        legend: { labels: { color: '#94a3b8' } },
+      },
+    },
+  });
+
+  // Detailed Statistics Table
+  renderDetailTable(summary, params);
 }
 
 function chartOptions(title, opts = {}) {
@@ -287,6 +389,42 @@ function chartOptions(title, opts = {}) {
   };
 }
 
+function renderDetailTable(summary, params) {
+  const labels = params.difficulties.map((d, i) => `Bot ${i + 1} (${d})`);
+
+  const rows = [
+    ['Wins', ...summary.perPlayer.map((p) => p.wins)],
+    ['Win Rate', ...summary.perPlayer.map((p) => (p.winRate * 100).toFixed(1) + '%')],
+    ['Win Rate CI', ...summary.winRateCI.map((ci) => `${(ci.lower * 100).toFixed(0)}-${(ci.upper * 100).toFixed(0)}%`)],
+    ['Median Score', ...summary.perPlayer.map((p) => Math.round(p.medianScore))],
+    ['Std Dev', ...summary.perPlayer.map((p) => p.stdDev.toFixed(1))],
+    ['Min Score', ...summary.perPlayer.map((p) => p.minScore)],
+    ['Max Score', ...summary.perPlayer.map((p) => p.maxScore)],
+    ['Max Win Streak', ...summary.perPlayer.map((p) => p.maxWinStreak)],
+  ];
+
+  let html = '<table><thead><tr><th>Stat</th>';
+  for (const l of labels) html += `<th>${l}</th>`;
+  html += '</tr></thead><tbody>';
+  for (const row of rows) {
+    html += '<tr>';
+    for (const cell of row) html += `<td>${cell}</td>`;
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+
+  const diffs = Object.entries(summary.perDifficulty);
+  if (diffs.length > 0) {
+    html += '<table><thead><tr><th>Difficulty</th><th>Bots</th><th>Win Rate</th><th>Avg Score</th></tr></thead><tbody>';
+    for (const [d, stats] of diffs) {
+      html += `<tr><td>${d}</td><td>${stats.bots}</td><td>${(stats.winRate * 100).toFixed(1)}%</td><td>${Math.round(stats.avgScore)}</td></tr>`;
+    }
+    html += '</tbody></table>';
+  }
+
+  $('player-stats-table').innerHTML = html;
+}
+
 function handleReset() {
   Object.entries(DEFAULTS).forEach(([key, val]) => {
     const el = $(key);
@@ -297,8 +435,11 @@ function handleReset() {
 
   // Clear results
   Object.values(charts).forEach((c) => c?.destroy());
-  charts = { winrate: null, breakdown: null, progression: null };
+  charts = { winrate: null, breakdown: null, progression: null, histogram: null, donut: null };
   $('results-content').classList.add('hidden');
   $('empty-state').classList.remove('hidden');
   $('validation-msg').classList.add('hidden');
+  $('player-stats-table').innerHTML = '';
+  if ($('ai-section')) $('ai-section').classList.add('hidden');
+  if ($('ai-result')) $('ai-result').classList.add('hidden');
 }
