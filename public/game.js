@@ -33,33 +33,47 @@ function shuffle(array) {
  * Create a new LUMINA game.
  * @param {{ botCount: number, botDifficulties: string[] }} opts
  */
-export function createGame({ botCount, botDifficulties }) {
-  const deck = createDeck(); // 112 cards, shuffled
+export function createGame({ botCount, botDifficulties, config, allBots }) {
+  const deck = createDeck(config); // 112 cards, shuffled
 
-  // Build players array: human first, then bots
-  const totalPlayers = 1 + botCount;
+  // Build players array
+  const totalPlayers = allBots ? botCount : 1 + botCount;
   const players = [];
 
-  players.push({
-    name: 'Player',
-    isBot: false,
-    difficulty: null,
-    grid: [],
-    prismsRemaining: 3,
-    revealsLeft: 2,
-    stats: { attacksMade: 0, prismsUsed: 0 },
-  });
-
-  for (let i = 0; i < botCount; i++) {
+  if (allBots) {
+    for (let i = 0; i < botCount; i++) {
+      players.push({
+        name: `Bot ${i + 1}`,
+        isBot: true,
+        difficulty: botDifficulties[i] || 'easy',
+        grid: [],
+        prismsRemaining: 3,
+        revealsLeft: 2,
+        stats: { attacksMade: 0, prismsUsed: 0 },
+      });
+    }
+  } else {
     players.push({
-      name: `Bot ${i + 1}`,
-      isBot: true,
-      difficulty: botDifficulties[i] || 'easy',
+      name: 'Player',
+      isBot: false,
+      difficulty: null,
       grid: [],
       prismsRemaining: 3,
       revealsLeft: 2,
       stats: { attacksMade: 0, prismsUsed: 0 },
     });
+
+    for (let i = 0; i < botCount; i++) {
+      players.push({
+        name: `Bot ${i + 1}`,
+        isBot: true,
+        difficulty: botDifficulties[i] || 'easy',
+        grid: [],
+        prismsRemaining: 3,
+        revealsLeft: 2,
+        stats: { attacksMade: 0, prismsUsed: 0 },
+      });
+    }
   }
 
   // Deal 12 cards per player into 3×4 grids, all face-down
@@ -88,6 +102,7 @@ export function createGame({ botCount, botDifficulties }) {
 
   // Game state
   const game = {
+    config: config || {},
     players,
     deck,
     discard,
@@ -424,7 +439,7 @@ export function createGame({ botCount, botDifficulties }) {
       const roundScores = [];
 
       for (let i = 0; i < this.players.length; i++) {
-        const result = calcRoundScore(this.players[i].grid);
+        const result = calcRoundScore(this.players[i].grid, this.config);
         roundScores.push(result.total);
       }
 
@@ -436,10 +451,11 @@ export function createGame({ botCount, botDifficulties }) {
           (s, i) => i === this.luminaCaller || s < callerScore
         );
 
+        const luminaBonus = this.config?.luminaBonus ?? 10;
         if (isStrictlyHighest) {
-          roundScores[this.luminaCaller] += 10;
+          roundScores[this.luminaCaller] += luminaBonus;
         } else {
-          roundScores[this.luminaCaller] -= 10;
+          roundScores[this.luminaCaller] -= luminaBonus;
         }
       }
 
@@ -452,7 +468,8 @@ export function createGame({ botCount, botDifficulties }) {
     // ── Game Over ─────────────────────────────────────────────────
 
     isGameOver() {
-      return this.cumulativeScores.some((s) => s >= 200);
+      const threshold = this.config?.winThreshold ?? 200;
+      return this.cumulativeScores.some((s) => s >= threshold);
     },
 
     getWinner() {

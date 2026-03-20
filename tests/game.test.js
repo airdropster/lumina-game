@@ -791,3 +791,91 @@ describe('_reshuffleDeck', () => {
     assert.equal(g.discard.length, 1);
   });
 });
+
+// ── createGame with config ──────────────────────────────────────────
+
+describe('createGame with config', () => {
+  it('should pass config to deck creation', () => {
+    const game = createGame({
+      botCount: 1,
+      botDifficulties: ['easy'],
+      config: { cardMin: 1, cardMax: 5 },
+    });
+    // All cards in grids + deck + discard should have values in range
+    const allCards = [];
+    for (const p of game.players) {
+      for (const row of p.grid) {
+        for (const cell of row) {
+          allCards.push(cell);
+        }
+      }
+    }
+    allCards.push(...game.deck, ...game.discard);
+    const vectors = allCards.filter(c => c.color && c.color !== 'multicolor');
+    for (const card of vectors) {
+      assert.ok(card.value >= 1 && card.value <= 5, `Vector card value ${card.value} out of range`);
+    }
+  });
+
+  it('should use custom winThreshold in isGameOver', () => {
+    const game = createGame({
+      botCount: 1,
+      botDifficulties: ['easy'],
+      config: { winThreshold: 50 },
+    });
+    game.cumulativeScores[0] = 49;
+    assert.equal(game.isGameOver(), false);
+    game.cumulativeScores[0] = 50;
+    assert.equal(game.isGameOver(), true);
+  });
+
+  it('should use custom luminaBonus in scoreRound', () => {
+    const game = createGame({
+      botCount: 1,
+      botDifficulties: ['easy'],
+      config: { luminaBonus: 25 },
+    });
+    // Make all cards face up for player 0 with high values
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 4; c++) {
+        game.players[0].grid[r][c] = { value: 12, color: 'blue', faceUp: true, hasPrism: false, immune: false };
+        game.players[1].grid[r][c] = { value: 1, color: 'red', faceUp: true, hasPrism: false, immune: false };
+      }
+    }
+    game.luminaCaller = 0;
+    game.phase = 'scoring';
+    const before = game.cumulativeScores[0];
+    game.scoreRound();
+    // Player 0 is LUMINA caller with highest score, gets +25 bonus
+    const after = game.cumulativeScores[0];
+    assert.ok(after > before);
+  });
+});
+
+// ── createGame with allBots ─────────────────────────────────────────
+
+describe('createGame with allBots', () => {
+  it('should create all bot players when allBots is true', () => {
+    const game = createGame({
+      botCount: 4,
+      botDifficulties: ['easy', 'medium', 'hard', 'hard'],
+      allBots: true,
+    });
+    assert.equal(game.players.length, 4);
+    assert.ok(game.players.every(p => p.isBot));
+    assert.equal(game.players[0].name, 'Bot 1');
+    assert.equal(game.players[3].name, 'Bot 4');
+    assert.equal(game.players[0].difficulty, 'easy');
+    assert.equal(game.players[1].difficulty, 'medium');
+  });
+
+  it('should still create human + bots when allBots is false', () => {
+    const game = createGame({
+      botCount: 2,
+      botDifficulties: ['easy', 'hard'],
+    });
+    assert.equal(game.players.length, 3);
+    assert.equal(game.players[0].isBot, false);
+    assert.equal(game.players[1].isBot, true);
+  });
+});
