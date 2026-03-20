@@ -1,0 +1,251 @@
+/* Simulator page styles — uses same design tokens as main game */
+
+/* Reset & base */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #020617;
+  color: #f8fafc;
+  min-height: 100vh;
+}
+
+/* Header */
+.sim-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #1e293b;
+  background: #0f172a;
+}
+.sim-header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.back-link {
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: color 150ms ease;
+}
+.back-link:hover { color: #f8fafc; }
+
+/* Layout */
+.sim-layout {
+  display: flex;
+  gap: 24px;
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: calc(100vh - 65px);
+}
+
+/* Left panel */
+.sim-params {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.param-group {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 16px;
+}
+.param-group h3 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-bottom: 12px;
+}
+.param-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.param-row:last-child { margin-bottom: 0; }
+
+.param-group label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+.param-group input[type="number"],
+.param-group select {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #f8fafc;
+  padding: 6px 8px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  width: 100%;
+}
+.param-group input[type="number"]:focus,
+.param-group select:focus {
+  outline: none;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+}
+
+/* Range slider */
+.param-group input[type="range"] {
+  width: 100%;
+  accent-color: #60a5fa;
+  margin: 4px 0;
+}
+
+/* Difficulty selects */
+.difficulty-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.difficulty-row span {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  min-width: 48px;
+}
+
+/* Buttons */
+.btn-primary {
+  background: #f8fafc;
+  color: #020617;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 150ms ease;
+  width: 100%;
+}
+.btn-primary:hover { opacity: 0.9; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-ghost {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 150ms ease;
+  width: 100%;
+}
+.btn-ghost:hover { color: #f8fafc; border-color: #64748b; }
+
+/* Progress */
+.progress-bar {
+  height: 6px;
+  background: #1e293b;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.progress-fill {
+  height: 100%;
+  background: #60a5fa;
+  border-radius: 3px;
+  transition: width 100ms ease;
+  width: 0%;
+}
+#progress-container {
+  text-align: center;
+}
+#progress-text {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* Validation */
+#validation-msg {
+  font-size: 0.8rem;
+  color: #ef4444;
+  padding: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+}
+
+/* Right panel */
+.sim-results {
+  flex: 1;
+  min-width: 0;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+/* Stat cards */
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+.stat-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Charts */
+.chart-container {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+/* Utilities */
+.hidden { display: none !important; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .sim-layout {
+    flex-direction: column;
+  }
+  .sim-params {
+    width: 100%;
+  }
+  .stat-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

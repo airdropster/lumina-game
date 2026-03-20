@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LUMINA — Party Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="simulator.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module" src="simulator.js"></script>
+</head>
+<body>
+  <header class="sim-header">
+    <a href="/" class="back-link">← Back to Game</a>
+    <h1>Party Simulator</h1>
+  </header>
+
+  <main class="sim-layout">
+    <!-- Left Panel: Parameters -->
+    <aside class="sim-params">
+      <section class="param-group">
+        <h3>Card Values</h3>
+        <div class="param-row">
+          <label>Normal min <input type="number" id="cardMin" value="1" min="1" max="20"></label>
+          <label>Normal max <input type="number" id="cardMax" value="12" min="2" max="50"></label>
+        </div>
+        <div class="param-row">
+          <label>Negative value <input type="number" id="negativeValue" value="-2" min="-20" max="-1"></label>
+          <label>Top value <input type="number" id="topValue" value="15" min="1" max="99"></label>
+        </div>
+      </section>
+
+      <section class="param-group">
+        <h3>Game Rules</h3>
+        <div class="param-row">
+          <label>Players <input type="number" id="playerCount" value="4" min="2" max="6"></label>
+          <label>Win threshold <input type="number" id="winThreshold" value="200" min="50" max="500"></label>
+        </div>
+      </section>
+
+      <section class="param-group">
+        <h3>Bonus Values</h3>
+        <div class="param-row">
+          <label>Column <input type="number" id="columnBonus" value="10" min="0" max="50"></label>
+          <label>Row <input type="number" id="rowBonus" value="10" min="0" max="50"></label>
+        </div>
+        <div class="param-row">
+          <label>Prism <input type="number" id="prismBonus" value="10" min="0" max="50"></label>
+          <label>LUMINA <input type="number" id="luminaBonus" value="10" min="0" max="50"></label>
+        </div>
+      </section>
+
+      <section class="param-group">
+        <h3>Simulation</h3>
+        <label>Number of games
+          <input type="range" id="gameCountSlider" min="10" max="1000" value="100" step="10">
+          <input type="number" id="gameCount" value="100" min="10" max="1000">
+        </label>
+        <div id="difficulty-container">
+          <!-- Populated by JS based on playerCount -->
+        </div>
+      </section>
+
+      <button id="run-btn" class="btn-primary">Run Simulation</button>
+      <button id="reset-btn" class="btn-ghost">Reset Defaults</button>
+      <div id="progress-container" class="hidden">
+        <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+        <span id="progress-text">0 / 100</span>
+      </div>
+      <div id="validation-msg" class="hidden"></div>
+    </aside>
+
+    <!-- Right Panel: Results -->
+    <section class="sim-results">
+      <div id="empty-state" class="empty-state">
+        <p>Configure parameters and run a simulation to see results.</p>
+      </div>
+      <div id="results-content" class="hidden">
+        <div class="stat-cards">
+          <div class="stat-card"><span class="stat-value" id="stat-games">—</span><span class="stat-label">Games</span></div>
+          <div class="stat-card"><span class="stat-value" id="stat-rounds">—</span><span class="stat-label">Avg Rounds</span></div>
+          <div class="stat-card"><span class="stat-value" id="stat-lumina">—</span><span class="stat-label">LUMINA Rate</span></div>
+          <div class="stat-card"><span class="stat-value" id="stat-winning">—</span><span class="stat-label">Avg Win Score</span></div>
+        </div>
+        <div class="chart-container"><canvas id="chart-winrate"></canvas></div>
+        <div class="chart-container"><canvas id="chart-breakdown"></canvas></div>
+        <div class="chart-container"><canvas id="chart-progression"></canvas></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
