@@ -66,7 +66,16 @@ self.onmessage = (e) => {
 
 **Async chunking in simulation engine:** To allow `postMessage` progress updates to actually send between games, add `setTimeout(0)` yielding every N games. However, since the worker thread doesn't need to paint UI, the `postMessage` calls are already non-blocking from the worker side — they queue on the main thread's event loop. The current synchronous loop in the worker is fine; progress messages will be delivered as the main thread processes them.
 
-**Fallback:** If `Worker` is unavailable (unlikely in modern browsers), fall back to synchronous execution with the existing code path.
+**Fallback:** Use `try/catch` around Worker creation to detect browsers that don't support `type: 'module'` Workers (Firefox < 114). On failure, fall back to synchronous `runSimulation()` on the main thread:
+```js
+try {
+  const worker = new Worker('simulator-worker.js', { type: 'module' });
+  // use worker...
+} catch (e) {
+  // fallback to synchronous runSimulation()
+}
+```
+**Minimum browser versions:** Chrome 80+, Firefox 114+, Safari 15+.
 
 ### Modified: `public/simulator.js`
 
@@ -77,11 +86,11 @@ self.onmessage = (e) => {
 
 ### Modified: `public/simulation-engine.js`
 
-- Add async yielding: every 10 games, yield with `setTimeout(0)` for progress delivery
-- Change `runSimulation` to async: `export async function runSimulation(params)`
-- `onProgress` still called synchronously from worker context (no DOM dependency)
-
-**Note:** Making `runSimulation` async means the worker needs to `await` it. Worker `onmessage` becomes async.
+- `runSimulation` remains **synchronous** — no async change needed. The Worker thread is already off the main thread, and `postMessage` calls queue on the main thread's event loop even from a synchronous loop.
+- Add enhanced stats computation: `median()`, `stdDev()`, `wilsonCI()`, `buildHistogram()` helpers
+- Expand `computeSummary()` to produce all new metrics (see section 2)
+- Use `values.reduce()` instead of `Math.min(...values)` to avoid stack overflow on large arrays
+- Guard `stdDev` and `wilsonCI` against empty/zero-length inputs
 
 ---
 
@@ -149,9 +158,13 @@ summary: {
   ],
 
   // NEW: Score progression with min/max bands
+  // Shape: scoreProgressionBands[roundIndex] = { avg: number[], min: number[], max: number[] }
+  // Each inner array is indexed by playerIndex
+  // e.g. scoreProgressionBands[0].avg[2] = avg cumulative score at round 0 for player 2
+  // Chart rendering: show bands only for aggregate (all players combined) to avoid
+  // visual clutter with 4-6 overlapping player bands
   scoreProgressionBands: [
-    // Per round: { avg: [...], min: [...], max: [...] }
-    { avg: [42, 45, 50, 48], min: [20, 22, 30, 25], max: [65, 70, 72, 68] },
+    { avg: [42, 45, 50, 48], min: [20, 22, 30, 25], max: [65, 70, 72, 68] }, // round 0
     // ... per round
   ],
 }
@@ -169,12 +182,15 @@ function median(arr) {
 }
 
 function stdDev(arr) {
+  if (arr.length <= 1) return 0;
   const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-  const variance = arr.reduce((sum, val) => sum + (val - mean) ** 2, 0) / arr.length;
+  // Sample standard deviation (Bessel's correction: n-1)
+  const variance = arr.reduce((sum, val) => sum + (val - mean) ** 2, 0) / (arr.length - 1);
   return Math.sqrt(variance);
 }
 
 function wilsonCI(wins, total, z = 1.96) {
+  if (total === 0) return { lower: 0, upper: 0 };
   // Wilson score interval for 95% confidence
   const p = wins / total;
   const denom = 1 + z * z / total;
@@ -184,8 +200,9 @@ function wilsonCI(wins, total, z = 1.96) {
 }
 
 function buildHistogram(values, bucketCount = 10) {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  // Use reduce instead of Math.min/max(...values) to avoid stack overflow on large arrays
+  const min = values.reduce((a, b) => Math.min(a, b), Infinity);
+  const max = values.reduce((a, b) => Math.max(a, b), -Infinity);
   const range = max - min || 1;
   const bucketSize = range / bucketCount;
   const buckets = [];
@@ -234,9 +251,7 @@ Layout: 2 rows × 4 cards (responsive: wraps to 2×2 on mobile).
 
 #### Enhanced Existing Charts
 
-**Win Rate bar chart** — add error bars using Chart.js `errorBars` plugin or custom drawing:
-- Show 95% confidence interval whiskers on each bar
-- Helps distinguish "Bot A wins 52% vs Bot B wins 48%" (not significant) from "Bot A wins 80% vs Bot B wins 20%" (significant)
+**Win Rate bar chart** — confidence intervals shown in the detailed stats table (not as chart error bars). No extra Chart.js plugin needed. The CI values in the table help users judge statistical significance.
 
 **Score Progression line chart** — add min/max bands:
 - Shaded area between min and max cumulative score at each round
@@ -276,26 +291,57 @@ Below all charts, a collapsible "Detailed Statistics" section:
 **`server.js` addition:**
 
 ```js
+// Simple in-memory rate limiter: 1 request per 10 seconds per IP
+const analyzeTimestamps = new Map();
+
+app.get('/api/analyze/status', (_req, res) => {
+  res.json({ available: !!process.env.GEMINI_API_KEY });
+});
+
 app.post('/api/analyze', express.json(), async (req, res) => {
+  // Rate limiting
+  const ip = req.ip;
+  const now = Date.now();
+  const last = analyzeTimestamps.get(ip) || 0;
+  if (now - last < 10000) {
+    return res.status(429).json({ error: 'Please wait 10 seconds between analyses.' });
+  }
+  analyzeTimestamps.set(ip, now);
+
+  // Input validation
   const { summary, config } = req.body;
+  if (!summary || !config) {
+    return res.status(400).json({ error: 'Missing summary or config.' });
+  }
 
-  const prompt = buildAnalysisPrompt(summary, config);
+  try {
+    const prompt = buildAnalysisPrompt(summary, config);
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
-      }),
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Gemini API error:', response.status, errText);
+      return res.status(502).json({ error: 'AI service unavailable. Try again.' });
     }
-  );
 
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Analysis unavailable.';
-  res.json({ analysis: text });
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Analysis unavailable.';
+    res.json({ analysis: text });
+  } catch (err) {
+    console.error('Gemini fetch error:', err.message);
+    res.status(502).json({ error: 'AI service unavailable. Try again.' });
+  }
 });
 ```
 
@@ -303,7 +349,7 @@ app.post('/api/analyze', express.json(), async (req, res) => {
 - Environment variable `GEMINI_API_KEY` on the server
 - For local dev: `.env` file (already gitignored)
 - For Dokploy: add environment variable in the deployment config
-- Key value: `AIzaSyB8yAmkGtGYSMNv1PthOjdCxbc056tpeKM`
+- Key value: stored securely, never committed to git
 
 **Analysis prompt template:**
 
