@@ -1,7 +1,5 @@
 /** @module simulator – Party Simulator UI controller */
 
-import { runSimulation } from './simulation-engine.js';
-
 const DEFAULTS = {
   cardMin: 1, cardMax: 12, negativeValue: -2, topValue: 15,
   playerCount: 4, winThreshold: 200,
@@ -92,6 +90,10 @@ function validate(params) {
   return null;
 }
 
+let activeWorker = null;
+let lastResults = null;
+let lastParams = null;
+
 async function handleRun() {
   const params = getParams();
   const error = validate(params);
@@ -109,9 +111,46 @@ async function handleRun() {
   $('progress-fill').style.width = '0%';
   $('progress-text').textContent = `0 / ${params.gameCount}`;
 
-  // Let UI paint before blocking with simulation
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  try {
+    const worker = new Worker('simulator-worker.js', { type: 'module' });
+    activeWorker = worker;
 
+    worker.postMessage({
+      gameCount: params.gameCount,
+      playerCount: params.playerCount,
+      difficulties: params.difficulties,
+      config: params.config,
+    });
+
+    worker.onmessage = (e) => {
+      if (e.data.type === 'progress') {
+        const { completed, total } = e.data;
+        const pct = (completed / total * 100).toFixed(0);
+        $('progress-fill').style.width = pct + '%';
+        $('progress-text').textContent = `${completed} / ${total}`;
+      }
+      if (e.data.type === 'results') {
+        worker.terminate();
+        activeWorker = null;
+        onSimulationComplete(e.data.results, params);
+      }
+    };
+
+    worker.onerror = (err) => {
+      console.error('Worker error:', err);
+      worker.terminate();
+      activeWorker = null;
+      runSimulationFallback(params);
+    };
+  } catch (e) {
+    console.warn('Module Worker not supported, falling back to sync:', e.message);
+    runSimulationFallback(params);
+  }
+}
+
+async function runSimulationFallback(params) {
+  const { runSimulation } = await import('./simulation-engine.js');
+  await new Promise((r) => setTimeout(r, 50));
   const results = runSimulation({
     ...params,
     onProgress: (completed, total) => {
@@ -120,8 +159,13 @@ async function handleRun() {
       $('progress-text').textContent = `${completed} / ${total}`;
     },
   });
+  onSimulationComplete(results, params);
+}
 
-  // Hide progress, show results
+function onSimulationComplete(results, params) {
+  lastResults = results;
+  lastParams = params;
+
   $('progress-container').classList.add('hidden');
   $('run-btn').disabled = false;
   $('empty-state').classList.add('hidden');
