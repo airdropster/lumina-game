@@ -94,7 +94,7 @@ function playRound(game) {
   // Let game update cumulative scores
   game.scoreRound();
 
-  return { scores, breakdowns, luminaCaller };
+  return { scores, breakdowns, luminaCaller, turns };
 }
 
 /**
@@ -205,7 +205,7 @@ export function buildHistogram(values, bucketCount = 10) {
  * @param {number} playerCount
  * @returns {object}
  */
-function computeSummary(games, playerCount) {
+function computeSummary(games, playerCount, difficulties) {
   const totalGames = games.length;
   const wins = new Array(playerCount).fill(0);
   const totalScores = new Array(playerCount).fill(0);
@@ -292,14 +292,129 @@ function computeSummary(games, playerCount) {
     });
   }
 
+  // --- Round stats (turns per round) ---
+  const allTurnCounts = [];
+  for (const game of games) {
+    for (const rd of game.roundDetails) {
+      if (typeof rd.turns === 'number') allTurnCounts.push(rd.turns);
+    }
+  }
+  const roundStats = {
+    avgTurns: allTurnCounts.length > 0
+      ? allTurnCounts.reduce((a, b) => a + b, 0) / allTurnCounts.length : 0,
+    minTurns: allTurnCounts.length > 0
+      ? allTurnCounts.reduce((a, b) => Math.min(a, b), Infinity) : 0,
+    maxTurns: allTurnCounts.length > 0
+      ? allTurnCounts.reduce((a, b) => Math.max(a, b), -Infinity) : 0,
+  };
+
+  // --- Per-player detailed stats ---
+  const playerFinalScores = [];
+  for (let i = 0; i < playerCount; i++) {
+    playerFinalScores.push(games.map((g) => g.finalScores[i]));
+  }
+
+  const maxWinStreaks = new Array(playerCount).fill(0);
+  const currentStreaks = new Array(playerCount).fill(0);
+  for (const game of games) {
+    for (let i = 0; i < playerCount; i++) {
+      if (game.winner === i) {
+        currentStreaks[i]++;
+        maxWinStreaks[i] = Math.max(maxWinStreaks[i], currentStreaks[i]);
+      } else {
+        currentStreaks[i] = 0;
+      }
+    }
+  }
+
+  const perPlayer = [];
+  for (let i = 0; i < playerCount; i++) {
+    const scores = playerFinalScores[i];
+    perPlayer.push({
+      wins: wins[i],
+      winRate: wins[i] / totalGames,
+      avgScore: avgScore[i],
+      medianScore: median(scores),
+      stdDev: stdDev(scores),
+      minScore: scores.reduce((a, b) => Math.min(a, b), Infinity),
+      maxScore: scores.reduce((a, b) => Math.max(a, b), -Infinity),
+      maxWinStreak: maxWinStreaks[i],
+    });
+  }
+
+  // --- Per-difficulty aggregated stats ---
+  const perDifficulty = {};
+  if (difficulties) {
+    const diffGroups = {};
+    for (let i = 0; i < playerCount; i++) {
+      const d = difficulties[i];
+      if (!diffGroups[d]) diffGroups[d] = { wins: 0, totalScore: 0, bots: 0 };
+      diffGroups[d].wins += wins[i];
+      diffGroups[d].totalScore += totalScores[i];
+      diffGroups[d].bots++;
+    }
+    for (const [d, g] of Object.entries(diffGroups)) {
+      perDifficulty[d] = {
+        wins: g.wins,
+        games: totalGames,
+        winRate: totalGames > 0 ? g.wins / totalGames : 0,
+        avgScore: g.bots > 0 ? g.totalScore / (totalGames * g.bots) : 0,
+        bots: g.bots,
+      };
+    }
+  }
+
+  // --- Score distribution (histogram per player) ---
+  const scoreDistribution = [];
+  for (let i = 0; i < playerCount; i++) {
+    scoreDistribution.push(buildHistogram(playerFinalScores[i], 10));
+  }
+
+  // --- Bonus contributions as percentages ---
+  const bonusContributions = [];
+  for (let i = 0; i < playerCount; i++) {
+    const b = avgBreakdown[i];
+    const total = (b.base + b.column + b.row + b.prism) || 1;
+    bonusContributions.push({
+      base: b.base / total,
+      column: b.column / total,
+      row: b.row / total,
+      prism: b.prism / total,
+    });
+  }
+
+  // --- Wilson CI for win rates ---
+  const winRateCI = [];
+  for (let i = 0; i < playerCount; i++) {
+    winRateCI.push(wilsonCI(wins[i], totalGames));
+  }
+
+  // --- Score progression bands (min/max per round) ---
+  const scoreProgressionBands = [];
+  for (let r = 0; r < maxRounds; r++) {
+    const avg = [];
+    const min = [];
+    const max = [];
+    for (let i = 0; i < playerCount; i++) {
+      const values = scoresByRound[r][i];
+      if (values.length > 0) {
+        avg.push(values.reduce((a, b) => a + b, 0) / values.length);
+        min.push(values.reduce((a, b) => Math.min(a, b), Infinity));
+        max.push(values.reduce((a, b) => Math.max(a, b), -Infinity));
+      } else {
+        avg.push(0);
+        min.push(0);
+        max.push(0);
+      }
+    }
+    scoreProgressionBands.push({ avg, min, max });
+  }
+
   return {
-    totalGames,
-    wins,
-    avgScore,
-    avgRounds,
-    luminaCallRate,
-    avgScoreByRound,
-    avgBreakdown,
+    totalGames, wins, avgScore, avgRounds, luminaCallRate,
+    avgScoreByRound, avgBreakdown,
+    perPlayer, perDifficulty, scoreDistribution,
+    bonusContributions, roundStats, winRateCI, scoreProgressionBands,
   };
 }
 
@@ -320,7 +435,7 @@ export function runSimulation({ gameCount, playerCount, difficulties, config = {
     }
   }
 
-  const summary = computeSummary(games, playerCount);
+  const summary = computeSummary(games, playerCount, difficulties);
 
   return { games, summary };
 }

@@ -129,3 +129,80 @@ describe('statistical helpers', () => {
     assert.equal(totalCount, 4);
   });
 });
+
+describe('enhanced summary statistics', () => {
+  const results = runSimulation({
+    gameCount: 20,
+    playerCount: 3,
+    difficulties: ['hard', 'medium', 'easy'],
+    config: {},
+  });
+  const { summary } = results;
+
+  it('should include perPlayer stats', () => {
+    assert.equal(summary.perPlayer.length, 3);
+    for (const p of summary.perPlayer) {
+      assert.ok(typeof p.wins === 'number');
+      assert.ok(typeof p.winRate === 'number');
+      assert.ok(typeof p.avgScore === 'number');
+      assert.ok(typeof p.medianScore === 'number');
+      assert.ok(typeof p.stdDev === 'number');
+      assert.ok(typeof p.minScore === 'number');
+      assert.ok(typeof p.maxScore === 'number');
+      assert.ok(typeof p.maxWinStreak === 'number');
+    }
+  });
+
+  it('perPlayer wins should sum to totalGames', () => {
+    const totalWins = summary.perPlayer.reduce((s, p) => s + p.wins, 0);
+    assert.equal(totalWins, 20);
+  });
+
+  it('should include perDifficulty stats', () => {
+    assert.ok(summary.perDifficulty.hard);
+    assert.ok(summary.perDifficulty.medium);
+    assert.ok(summary.perDifficulty.easy);
+    assert.ok(typeof summary.perDifficulty.hard.winRate === 'number');
+  });
+
+  it('should include scoreDistribution per player', () => {
+    assert.equal(summary.scoreDistribution.length, 3);
+    for (const dist of summary.scoreDistribution) {
+      assert.ok(Array.isArray(dist));
+      assert.ok(dist.length > 0);
+      const total = dist.reduce((s, b) => s + b.count, 0);
+      assert.equal(total, 20);
+    }
+  });
+
+  it('should include bonusContributions per player', () => {
+    assert.equal(summary.bonusContributions.length, 3);
+    for (const bc of summary.bonusContributions) {
+      const sum = bc.base + bc.column + bc.row + bc.prism;
+      assert.ok(sum > 0.95 && sum < 1.05, `Contributions should sum to ~1.0, got ${sum}`);
+    }
+  });
+
+  it('should include roundStats', () => {
+    assert.ok(typeof summary.roundStats.avgTurns === 'number');
+    assert.ok(typeof summary.roundStats.minTurns === 'number');
+    assert.ok(typeof summary.roundStats.maxTurns === 'number');
+    assert.ok(summary.roundStats.minTurns <= summary.roundStats.maxTurns);
+  });
+
+  it('should include winRateCI per player', () => {
+    assert.equal(summary.winRateCI.length, 3);
+    for (const ci of summary.winRateCI) {
+      assert.ok(ci.lower >= 0 && ci.upper <= 1);
+      assert.ok(ci.lower <= ci.upper);
+    }
+  });
+
+  it('should include scoreProgressionBands', () => {
+    assert.ok(summary.scoreProgressionBands.length > 0);
+    const band = summary.scoreProgressionBands[0];
+    assert.equal(band.avg.length, 3);
+    assert.equal(band.min.length, 3);
+    assert.equal(band.max.length, 3);
+  });
+});
