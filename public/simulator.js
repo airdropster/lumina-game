@@ -37,6 +37,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('run-btn').addEventListener('click', handleRun);
   $('reset-btn').addEventListener('click', handleReset);
+
+  // Check AI availability and wire up button
+  fetch('/api/analyze/status')
+    .then((r) => r.json())
+    .then((data) => {
+      if (data.available) {
+        $('analyze-btn')?.addEventListener('click', handleAnalyze);
+        $('reanalyze-btn')?.addEventListener('click', handleAnalyze);
+      } else {
+        const aiSection = $('ai-section');
+        if (aiSection) aiSection.remove();
+      }
+    })
+    .catch(() => {
+      const aiSection = $('ai-section');
+      if (aiSection) aiSection.remove();
+    });
 });
 
 function buildDifficultySelects(count) {
@@ -170,6 +187,13 @@ function onSimulationComplete(results, params) {
   $('run-btn').disabled = false;
   $('empty-state').classList.add('hidden');
   $('results-content').classList.remove('hidden');
+
+  // Show AI section if available
+  if ($('ai-section')) {
+    $('ai-section').classList.remove('hidden');
+    $('ai-result')?.classList.add('hidden');
+    $('analyze-btn')?.classList.remove('hidden');
+  }
 
   renderResults(results, params);
 }
@@ -423,6 +447,54 @@ function renderDetailTable(summary, params) {
   }
 
   $('player-stats-table').innerHTML = html;
+}
+
+async function handleAnalyze() {
+  if (!lastResults || !lastParams) return;
+
+  $('analyze-btn').classList.add('hidden');
+  $('ai-loading').classList.remove('hidden');
+  $('ai-result').classList.add('hidden');
+
+  try {
+    const resp = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        summary: lastResults.summary,
+        config: lastParams.config,
+      }),
+    });
+
+    const data = await resp.json();
+
+    if (resp.ok) {
+      $('ai-text').innerHTML = formatAnalysis(data.analysis);
+      $('ai-result').classList.remove('hidden');
+    } else {
+      $('ai-text').textContent = data.error || 'Analysis failed.';
+      $('ai-result').classList.remove('hidden');
+    }
+  } catch (err) {
+    $('ai-text').textContent = 'Failed to reach server. Try again.';
+    $('ai-result').classList.remove('hidden');
+  }
+
+  $('ai-loading').classList.add('hidden');
+  $('analyze-btn').classList.add('hidden');
+}
+
+function formatAnalysis(text) {
+  // Escape HTML entities first to prevent XSS
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return escaped
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^\s*[-\u2022]\s+(.*)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+    .replace(/\n/g, '<br>');
 }
 
 function handleReset() {
