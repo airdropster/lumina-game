@@ -159,6 +159,46 @@ function playGame(playerCount, difficulties, config) {
   };
 }
 
+export function median(arr) {
+  if (arr.length === 0) return 0;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+export function stdDev(arr) {
+  if (arr.length <= 1) return 0;
+  const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+  const variance = arr.reduce((sum, val) => sum + (val - mean) ** 2, 0) / (arr.length - 1);
+  return Math.sqrt(variance);
+}
+
+export function wilsonCI(wins, total, z = 1.96) {
+  if (total === 0) return { lower: 0, upper: 0 };
+  const p = wins / total;
+  const denom = 1 + z * z / total;
+  const center = (p + z * z / (2 * total)) / denom;
+  const margin = (z * Math.sqrt(p * (1 - p) / total + z * z / (4 * total * total))) / denom;
+  return { lower: Math.max(0, center - margin), upper: Math.min(1, center + margin) };
+}
+
+export function buildHistogram(values, bucketCount = 10) {
+  if (values.length === 0) return [];
+  const min = values.reduce((a, b) => Math.min(a, b), Infinity);
+  const max = values.reduce((a, b) => Math.max(a, b), -Infinity);
+  const range = max - min || 1;
+  const bucketSize = range / bucketCount;
+  const buckets = [];
+  for (let i = 0; i < bucketCount; i++) {
+    buckets.push({ min: min + i * bucketSize, max: min + (i + 1) * bucketSize, count: 0 });
+  }
+  for (const v of values) {
+    const idx = Math.min(Math.floor((v - min) / bucketSize), bucketCount - 1);
+    buckets[idx].count++;
+  }
+  return buckets;
+}
+
 /**
  * Compute summary statistics from game results.
  * @param {object[]} games
