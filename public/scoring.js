@@ -11,7 +11,8 @@ import { COLORS } from './cards.js';
  * @param {Array<Array<{value:number, color:string|null, faceUp:boolean, hasPrism:boolean}>>} grid 3×4
  * @returns {number} bonus points
  */
-export function calcColumnBonus(grid) {
+export function calcColumnBonus(grid, config = {}) {
+  const bonusValue = config.columnBonus ?? 10;
   let bonus = 0;
 
   for (let col = 0; col < 4; col++) {
@@ -30,13 +31,13 @@ export function calcColumnBonus(grid) {
 
     // All wildcards → qualifies (they adopt the same color)
     if (concreteColors.length === 0) {
-      bonus += 10;
+      bonus += bonusValue;
       continue;
     }
 
     // All concrete colors must be the same
     if (concreteColors.every((c) => c === concreteColors[0])) {
-      bonus += 10;
+      bonus += bonusValue;
     }
   }
 
@@ -50,7 +51,8 @@ export function calcColumnBonus(grid) {
  * @param {Array<Array<{value:number, color:string|null, faceUp:boolean, hasPrism:boolean}>>} grid 3×4
  * @returns {number} bonus points
  */
-export function calcRowBonus(grid) {
+export function calcRowBonus(grid, config = {}) {
+  const bonusValue = config.rowBonus ?? 10;
   let bonus = 0;
 
   for (let row = 0; row < 3; row++) {
@@ -67,7 +69,7 @@ export function calcRowBonus(grid) {
       }
     }
 
-    if (increasing) bonus += 10;
+    if (increasing) bonus += bonusValue;
   }
 
   return bonus;
@@ -80,7 +82,9 @@ export function calcRowBonus(grid) {
  * @param {Array<Array<{value:number, color:string|null, faceUp:boolean, hasPrism:boolean}>>} grid 3×4
  * @returns {number} bonus points
  */
-export function calcPrismBonus(grid) {
+export function calcPrismBonus(grid, config = {}) {
+  const bonusValue = config.prismBonus ?? 10;
+
   // Determine valid columns
   const validCols = new Set();
   for (let col = 0; col < 4; col++) {
@@ -110,12 +114,12 @@ export function calcPrismBonus(grid) {
     if (increasing) validRows.add(row);
   }
 
-  // Award prism bonus: +10 once if any prismed card is in a valid structure
+  // Award prism bonus once if any prismed card is in a valid structure
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 4; col++) {
       const card = grid[row][col];
       if (card.hasPrism && (validCols.has(col) || validRows.has(row))) {
-        return 10;
+        return bonusValue;
       }
     }
   }
@@ -129,7 +133,7 @@ export function calcPrismBonus(grid) {
  * @param {Array<Array<{value:number, color:string|null, faceUp:boolean, hasPrism:boolean}>>} grid 3×4
  * @returns {{visibleSum:number, faceDownCount:number, faceDownPenalty:number, baseScore:number, columnBonus:number, rowBonus:number, prismBonus:number, total:number}}
  */
-export function calcRoundScore(grid) {
+export function calcRoundScore(grid, config = {}) {
   let visibleSum = 0;
   let faceDownCount = 0;
 
@@ -146,9 +150,9 @@ export function calcRoundScore(grid) {
 
   const faceDownPenalty = faceDownCount > 0 ? faceDownCount * -5 : 0;
   const baseScore = visibleSum + faceDownPenalty;
-  const columnBonus = calcColumnBonus(grid);
-  const rowBonus = calcRowBonus(grid);
-  const prismBonus = calcPrismBonus(grid);
+  const columnBonus = calcColumnBonus(grid, config);
+  const rowBonus = calcRowBonus(grid, config);
+  const prismBonus = calcPrismBonus(grid, config);
   const total = baseScore + columnBonus + rowBonus + prismBonus;
 
   // Determine valid structure indices for UI highlights

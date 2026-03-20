@@ -291,3 +291,41 @@ describe('calcRoundScore validColumns and validRows', () => {
     assert.deepEqual(result.validRows, []);
   });
 });
+
+// ── scoring with custom config ──────────────────────────────────────
+
+describe('scoring with custom config', () => {
+  const customConfig = { columnBonus: 25, rowBonus: 15, prismBonus: 20 };
+
+  it('calcColumnBonus uses config.columnBonus', () => {
+    const grid = makeGrid();
+    assert.equal(calcColumnBonus(grid, customConfig), 100); // 4 × 25
+  });
+
+  it('calcColumnBonus defaults to 10 without config', () => {
+    const grid = makeGrid();
+    assert.equal(calcColumnBonus(grid), 40); // 4 × 10
+  });
+
+  it('calcRowBonus uses config.rowBonus', () => {
+    const grid = makeGrid({
+      '0,0': c(1, 'blue'), '0,1': c(3, 'blue'), '0,2': c(7, 'blue'), '0,3': c(11, 'blue'),
+    });
+    assert.equal(calcRowBonus(grid, customConfig), 15);
+  });
+
+  it('calcPrismBonus uses config.prismBonus', () => {
+    const grid = makeGrid({
+      '0,0': c(5, 'blue', true, true),
+    });
+    assert.equal(calcPrismBonus(grid, customConfig), 20);
+  });
+
+  it('calcRoundScore threads config to all sub-functions', () => {
+    const grid = makeGrid();
+    const result = calcRoundScore(grid, customConfig);
+    assert.equal(result.columnBonus, 100); // 4 × 25
+    assert.equal(result.rowBonus, 0);
+    assert.equal(result.prismBonus, 0);
+  });
+});
