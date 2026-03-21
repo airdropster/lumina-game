@@ -20,6 +20,7 @@ Chart.defaults.borderColor = '#1e293b';
 
 // Init
 document.addEventListener('DOMContentLoaded', () => {
+  createWorkerPool();
   buildDifficultySelects(+$('playerCount').value);
 
   // Sync slider <-> number input
@@ -107,9 +108,23 @@ function validate(params) {
   return null;
 }
 
-let activeWorker = null;
+let workerPool = [];
 let lastResults = null;
 let lastParams = null;
+
+function createWorkerPool() {
+  const size = Math.min(navigator.hardwareConcurrency || 4, 8);
+  workerPool = [];
+  for (let i = 0; i < size; i++) {
+    try {
+      workerPool.push(new Worker('simulator-worker.js', { type: 'module' }));
+    } catch (e) {
+      // Module workers not supported — fall back to sync
+      workerPool = [];
+      return;
+    }
+  }
+}
 
 async function handleRun() {
   const params = getParams();
@@ -128,40 +143,65 @@ async function handleRun() {
   $('progress-fill').style.width = '0%';
   $('progress-text').textContent = `0 / ${params.gameCount}`;
 
-  try {
-    const worker = new Worker('simulator-worker.js', { type: 'module' });
-    activeWorker = worker;
+  if (workerPool.length > 0) {
+    runWithWorkerPool(params);
+  } else {
+    runSimulationFallback(params);
+  }
+}
 
-    worker.postMessage({
-      gameCount: params.gameCount,
-      playerCount: params.playerCount,
-      difficulties: params.difficulties,
-      config: params.config,
-    });
+function runWithWorkerPool(params) {
+  const poolSize = Math.min(workerPool.length, params.gameCount);
+  const chunkSize = Math.ceil(params.gameCount / poolSize);
+  const completedPerWorker = new Array(poolSize).fill(0);
+  const allGames = [];
+  let workersFinished = 0;
+
+  for (let i = 0; i < poolSize; i++) {
+    const workerGameCount = Math.min(chunkSize, params.gameCount - i * chunkSize);
+    if (workerGameCount <= 0) {
+      workersFinished++;
+      continue;
+    }
+    const worker = workerPool[i];
 
     worker.onmessage = (e) => {
       if (e.data.type === 'progress') {
-        const { completed, total } = e.data;
-        const pct = (completed / total * 100).toFixed(0);
+        completedPerWorker[i] = e.data.completed;
+        const totalCompleted = completedPerWorker.reduce((a, b) => a + b, 0);
+        const pct = (totalCompleted / params.gameCount * 100).toFixed(0);
         $('progress-fill').style.width = pct + '%';
-        $('progress-text').textContent = `${completed} / ${total}`;
+        $('progress-text').textContent = `${totalCompleted} / ${params.gameCount}`;
       }
-      if (e.data.type === 'results') {
-        worker.terminate();
-        activeWorker = null;
-        onSimulationComplete(e.data.results, params);
+      if (e.data.type === 'done') {
+        allGames.push(...e.data.games);
+        workersFinished++;
+
+        if (workersFinished >= poolSize) {
+          // All workers done — compute summary on main thread
+          import('./simulation-engine.js').then(({ computeSummary }) => {
+            const summary = computeSummary(allGames, params.playerCount, params.difficulties);
+            onSimulationComplete({ games: allGames, summary }, params);
+          });
+        }
       }
     };
 
     worker.onerror = (err) => {
       console.error('Worker error:', err);
-      worker.terminate();
-      activeWorker = null;
-      runSimulationFallback(params);
+      workersFinished++;
+      // If all workers errored, fallback
+      if (workersFinished >= poolSize && allGames.length === 0) {
+        runSimulationFallback(params);
+      }
     };
-  } catch (e) {
-    console.warn('Module Worker not supported, falling back to sync:', e.message);
-    runSimulationFallback(params);
+
+    worker.postMessage({
+      gameCount: workerGameCount,
+      playerCount: params.playerCount,
+      difficulties: params.difficulties,
+      config: params.config,
+    });
   }
 }
 
