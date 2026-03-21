@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { runSimulation, median, stdDev, wilsonCI, buildHistogram } from '../public/simulation-engine.js';
+import { runSimulation, runBatch, computeSummary, median, stdDev, wilsonCI, buildHistogram } from '../public/simulation-engine.js';
 
 describe('runSimulation', () => {
   it('should return correct results shape', () => {
@@ -204,5 +204,52 @@ describe('enhanced summary statistics', () => {
     assert.equal(band.avg.length, 3);
     assert.equal(band.min.length, 3);
     assert.equal(band.max.length, 3);
+  });
+});
+
+describe('runBatch', () => {
+  it('should return raw games array without summary', () => {
+    const games = runBatch({
+      gameCount: 5,
+      playerCount: 2,
+      difficulties: ['easy', 'easy'],
+      config: {},
+    });
+    assert.ok(Array.isArray(games));
+    assert.equal(games.length, 5);
+    for (const g of games) {
+      assert.ok(typeof g.winner === 'number');
+      assert.ok(Array.isArray(g.finalScores));
+      assert.ok(Array.isArray(g.roundDetails));
+      assert.ok(typeof g.rounds === 'number');
+    }
+  });
+
+  it('should call onProgress callback', () => {
+    let calls = 0;
+    runBatch({
+      gameCount: 3,
+      playerCount: 2,
+      difficulties: ['easy', 'easy'],
+      config: {},
+      onProgress: () => { calls++; },
+    });
+    assert.equal(calls, 3);
+  });
+});
+
+describe('computeSummary', () => {
+  it('should produce same summary whether called via runSimulation or separately', () => {
+    const params = {
+      gameCount: 5,
+      playerCount: 2,
+      difficulties: ['easy', 'easy'],
+      config: {},
+    };
+    const { games, summary: expected } = runSimulation(params);
+    const actual = computeSummary(games, params.playerCount, params.difficulties);
+    assert.equal(actual.totalGames, expected.totalGames);
+    assert.deepEqual(actual.wins, expected.wins);
+    assert.equal(actual.avgRounds, expected.avgRounds);
   });
 });

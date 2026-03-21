@@ -419,11 +419,12 @@ function computeSummary(games, playerCount, difficulties) {
 }
 
 /**
- * Run a batch of bot-vs-bot simulations.
+ * Run a batch of games and return raw results (no summary).
+ * Used by workers — each worker runs a chunk and returns games[].
  * @param {{ gameCount: number, playerCount: number, difficulties: string[], config?: object, onProgress?: function }} params
- * @returns {{ games: object[], summary: object }}
+ * @returns {object[]} Raw games array
  */
-export function runSimulation({ gameCount, playerCount, difficulties, config = {}, onProgress }) {
+export function runBatch({ gameCount, playerCount, difficulties, config = {}, onProgress }) {
   const games = [];
 
   for (let g = 0; g < gameCount; g++) {
@@ -435,7 +436,20 @@ export function runSimulation({ gameCount, playerCount, difficulties, config = {
     }
   }
 
-  const summary = computeSummary(games, playerCount, difficulties);
+  return games;
+}
 
+// Export computeSummary for main-thread use after merging worker results
+export { computeSummary };
+
+/**
+ * Run a batch of bot-vs-bot simulations.
+ * Backward-compatible wrapper: calls runBatch then computeSummary.
+ * @param {{ gameCount: number, playerCount: number, difficulties: string[], config?: object, onProgress?: function }} params
+ * @returns {{ games: object[], summary: object }}
+ */
+export function runSimulation({ gameCount, playerCount, difficulties, config = {}, onProgress }) {
+  const games = runBatch({ gameCount, playerCount, difficulties, config, onProgress });
+  const summary = computeSummary(games, playerCount, difficulties);
   return { games, summary };
 }
