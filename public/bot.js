@@ -751,26 +751,22 @@ function generateAllCandidateActions(game, playerIndex) {
  * No class instances, no DOM, just arrays and primitives.
  */
 function cloneGameForSim(game) {
-  const players = game.players.map((p) => ({
-    name: p.name,
-    isBot: p.isBot,
-    difficulty: p.difficulty,
-    prismsRemaining: p.prismsRemaining,
-    grid: p.grid.map((row) =>
-      row.map((card) => ({
-        value: card.value,
-        color: card.color,
-        faceUp: card.faceUp,
-        hasPrism: card.hasPrism,
-        immune: card.immune,
-      }))
-    ),
-  }));
+  const players = game.players.map((p) => {
+    const grid = [
+      p.grid[0].map(c => ({ value: c.value, color: c.color, faceUp: c.faceUp, hasPrism: c.hasPrism, immune: c.immune })),
+      p.grid[1].map(c => ({ value: c.value, color: c.color, faceUp: c.faceUp, hasPrism: c.hasPrism, immune: c.immune })),
+      p.grid[2].map(c => ({ value: c.value, color: c.color, faceUp: c.faceUp, hasPrism: c.hasPrism, immune: c.immune })),
+    ];
+    return {
+      name: p.name, isBot: p.isBot, difficulty: p.difficulty,
+      prismsRemaining: p.prismsRemaining, grid,
+    };
+  });
 
   return {
     players,
-    deckLength: game.deck.length,
-    discard: game.discard.map((c) => ({ value: c.value, color: c.color })),
+    deckLength: game.deck ? game.deck.length : (game.deckLength || 0),
+    discard: game.discard.map(c => ({ value: c.value, color: c.color })),
     cumulativeScores: [...game.cumulativeScores],
     phase: game.phase,
     currentPlayerIndex: game.currentPlayerIndex,
