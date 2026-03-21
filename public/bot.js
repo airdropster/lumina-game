@@ -867,14 +867,31 @@ function generateRandomCard() {
 function generateRandomAction(clone, playerIndex) {
   const player = clone.players[playerIndex];
   const grid = player.grid;
-  const faceDown = getFaceDownPositions(grid);
-  const visibleUnprismed = getVisibleUnprismedPositions(grid);
 
-  // 70% construct, 15% attack, 15% secure
+  let faceDownCount = 0, visibleUnprismedCount = 0;
+  let fdR = -1, fdC = -1, vuR = -1, vuC = -1;
+  let allCount = 0, allR = -1, allC = -1;
+
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 4; c++) {
+      const card = grid[r][c];
+      if (!card.faceUp) {
+        faceDownCount++;
+        if (Math.random() * faceDownCount < 1) { fdR = r; fdC = c; }
+        allCount++;
+        if (Math.random() * allCount < 1) { allR = r; allC = c; }
+      } else if (!card.hasPrism) {
+        visibleUnprismedCount++;
+        if (Math.random() * visibleUnprismedCount < 1) { vuR = r; vuC = c; }
+        allCount++;
+        if (Math.random() * allCount < 1) { allR = r; allC = c; }
+      }
+    }
+  }
+
   const roll = Math.random();
 
-  if (roll < 0.15 && faceDown.length > 0 && visibleUnprismed.length > 0) {
-    // Try attack
+  if (roll < 0.15 && faceDownCount > 0 && visibleUnprismedCount > 0) {
     for (let di = 0; di < clone.players.length; di++) {
       if (di === playerIndex) continue;
       const defGrid = clone.players[di].grid;
@@ -882,15 +899,13 @@ function generateRandomAction(clone, playerIndex) {
         for (let c = 0; c < 4; c++) {
           const card = defGrid[r][c];
           if (card.faceUp && !card.hasPrism && !card.immune) {
-            const [ar, ac] = pickRandom(visibleUnprismed);
-            if (card.value > grid[ar][ac].value) {
-              const [costR, costC] = pickRandom(faceDown);
+            if (vuR >= 0 && card.value > grid[vuR][vuC].value) {
               return {
                 type: 'attack',
-                attackerRow: ar, attackerCol: ac,
+                attackerRow: vuR, attackerCol: vuC,
                 defenderIndex: di,
                 defenderRow: r, defenderCol: c,
-                revealRow: costR, revealCol: costC,
+                revealRow: fdR, revealCol: fdC,
               };
             }
           }
@@ -899,34 +914,25 @@ function generateRandomAction(clone, playerIndex) {
     }
   }
 
-  if (roll < 0.30 && visibleUnprismed.length > 0 && player.prismsRemaining > 0) {
-    // Try secure
-    const [r, c] = pickRandom(visibleUnprismed);
-    if (grid[r][c].value >= 5) {
-      return { type: 'secure', row: r, col: c };
+  if (roll < 0.30 && visibleUnprismedCount > 0 && player.prismsRemaining > 0) {
+    if (vuR >= 0 && grid[vuR][vuC].value >= 5) {
+      return { type: 'secure', row: vuR, col: vuC };
     }
   }
 
-  // Default: construct
-  const allPositions = [...visibleUnprismed, ...faceDown];
-  if (allPositions.length === 0) {
-    // Fallback
+  if (allCount === 0) {
     return { type: 'construct', source: 'deck', row: 0, col: 0 };
   }
-  const [tr, tc] = pickRandom(allPositions);
 
-  // Sometimes use discard
   if (clone.discard.length > 0 && Math.random() < 0.3) {
-    return { type: 'construct', source: 'discard', row: tr, col: tc };
+    return { type: 'construct', source: 'discard', row: allR, col: allC };
   }
 
-  // Sometimes use deck_discard for face-down
-  if (faceDown.length > 0 && Math.random() < 0.2) {
-    const [fr, fc] = pickRandom(faceDown);
-    return { type: 'construct', source: 'deck_discard', revealRow: fr, revealCol: fc };
+  if (faceDownCount > 0 && Math.random() < 0.2) {
+    return { type: 'construct', source: 'deck_discard', revealRow: fdR, revealCol: fdC };
   }
 
-  return { type: 'construct', source: 'deck', row: tr, col: tc };
+  return { type: 'construct', source: 'deck', row: allR, col: allC };
 }
 
 /**
