@@ -244,7 +244,7 @@ export function renderSetupScreen(container, onStart, onViewStats) {
   simBtn.textContent = 'PARTY SIMULATOR';
   simBtn.style.display = 'block';
   simBtn.style.margin = 'var(--sp-3) auto 0';
-  simBtn.addEventListener('click', () => { window.location.href = '/simulator'; });
+  simBtn.addEventListener('click', () => { window.location.href = 'simulator'; });
   card.appendChild(simBtn);
 
   screen.appendChild(card);
