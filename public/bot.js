@@ -789,18 +789,13 @@ function applyActionToClone(clone, playerIndex, action) {
     if (action.source === 'discard' && clone.discard.length > 0) {
       const drawn = clone.discard.pop();
       const target = grid[action.row][action.col];
-      // Discard old card
       clone.discard.push({ value: target.value, color: target.color });
-      // Place new card
-      grid[action.row][action.col] = {
-        value: drawn.value,
-        color: drawn.color,
-        faceUp: true,
-        hasPrism: false,
-        immune: false,
-      };
+      target.value = drawn.value;
+      target.color = drawn.color;
+      target.faceUp = true;
+      target.hasPrism = false;
+      target.immune = false;
     } else if (action.source === 'deck_discard') {
-      // Draw random card, discard it, reveal face-down
       const randomCard = generateRandomCard();
       clone.discard.push(randomCard);
       clone.deckLength = Math.max(0, clone.deckLength - 1);
@@ -808,17 +803,14 @@ function applyActionToClone(clone, playerIndex, action) {
         grid[action.revealRow][action.revealCol].faceUp = true;
       }
     } else {
-      // Construct from deck
       const randomCard = generateRandomCard();
       const target = grid[action.row][action.col];
       clone.discard.push({ value: target.value, color: target.color });
-      grid[action.row][action.col] = {
-        value: randomCard.value,
-        color: randomCard.color,
-        faceUp: true,
-        hasPrism: false,
-        immune: false,
-      };
+      target.value = randomCard.value;
+      target.color = randomCard.color;
+      target.faceUp = true;
+      target.hasPrism = false;
+      target.immune = false;
       clone.deckLength = Math.max(0, clone.deckLength - 1);
     }
   } else if (action.type === 'attack') {
@@ -826,29 +818,26 @@ function applyActionToClone(clone, playerIndex, action) {
     const attackerCard = grid[action.attackerRow][action.attackerCol];
     const defenderCard = defender.grid[action.defenderRow][action.defenderCol];
 
-    // Reveal cost card
     if (action.revealRow !== undefined) {
       grid[action.revealRow][action.revealCol].faceUp = true;
     }
 
-    // Swap
-    grid[action.attackerRow][action.attackerCol] = {
-      value: defenderCard.value,
-      color: defenderCard.color,
-      faceUp: true,
-      hasPrism: false,
-      immune: false,
-    };
-    defender.grid[action.defenderRow][action.defenderCol] = {
-      value: attackerCard.value,
-      color: attackerCard.color,
-      faceUp: true,
-      hasPrism: false,
-      immune: true,
-    };
+    const aVal = attackerCard.value, aCol = attackerCard.color;
+    const dVal = defenderCard.value, dCol = defenderCard.color;
+
+    attackerCard.value = dVal;
+    attackerCard.color = dCol;
+    attackerCard.faceUp = true;
+    attackerCard.hasPrism = false;
+    attackerCard.immune = false;
+
+    defenderCard.value = aVal;
+    defenderCard.color = aCol;
+    defenderCard.faceUp = true;
+    defenderCard.hasPrism = false;
+    defenderCard.immune = true;
   } else if (action.type === 'secure') {
-    const card = grid[action.row][action.col];
-    card.hasPrism = true;
+    grid[action.row][action.col].hasPrism = true;
     player.prismsRemaining--;
   }
 }
