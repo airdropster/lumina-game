@@ -1,12 +1,12 @@
-import { runSimulation } from './simulation-engine.js';
+import { runBatch } from './simulation-engine.js';
 
 self.onmessage = (e) => {
   const params = e.data;
-  const results = runSimulation({
+  const games = runBatch({
     ...params,
     onProgress: (completed, total) => {
       self.postMessage({ type: 'progress', completed, total });
     },
   });
-  self.postMessage({ type: 'results', results });
+  self.postMessage({ type: 'done', games });
 };
