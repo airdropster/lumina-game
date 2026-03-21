@@ -635,12 +635,24 @@ function chooseHardAction(game, playerIndex) {
     return buildConstructAction(game, playerIndex, 'hard');
   }
 
-  // Run Monte Carlo for each candidate
-  let bestAction = candidates[0];
+  const MAX_MC_CANDIDATES = 10;
+  let mcCandidates = candidates;
+
+  if (candidates.length > MAX_MC_CANDIDATES) {
+    const scored = candidates.map(candidate => {
+      const clone = cloneGameForSim(game);
+      applyActionToClone(clone, playerIndex, candidate);
+      return { candidate, quickScore: evaluateBoard(clone, playerIndex) };
+    });
+    scored.sort((a, b) => b.quickScore - a.quickScore);
+    mcCandidates = scored.slice(0, MAX_MC_CANDIDATES).map(s => s.candidate);
+  }
+
+  let bestAction = mcCandidates[0];
   let bestScore = -Infinity;
 
-  for (const candidate of candidates) {
-    const score = simulateGame(game, playerIndex, candidate, 3, 50);
+  for (const candidate of mcCandidates) {
+    const score = simulateGame(game, playerIndex, candidate, 3, 20);
     if (score > bestScore) {
       bestScore = score;
       bestAction = candidate;
